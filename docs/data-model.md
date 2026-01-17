@@ -2,417 +2,200 @@
 
 ## Overview
 
-This document defines the core data structures for Vibe Manager. The primary entity is the **Engineer** (direct report), with supporting entities for notes, mood entries, and career tracking.
+Pure markdown workspace. No JSON, no database. Everything is markdown files with YAML frontmatter.
 
-## Entity Relationship Diagram
+**Design principles:**
+- **Markdown only** - No JSON files, everything human-readable
+- **Frontmatter for data** - Structured fields in YAML frontmatter
+- **Folders are engineers** - Each person = one folder
+- **Files are meetings** - Each note file = one 1-on-1 record
+- **Editable anywhere** - vim, VS Code, Obsidian, any text editor
+
+## Folder Structure
 
 ```
-┌─────────────────┐       ┌─────────────────┐
-│    Engineer     │───────│   MoodEntry     │
-│                 │ 1   * │                 │
-└─────────────────┘       └─────────────────┘
-        │
-        │ 1
-        │
-        │ *
-┌─────────────────┐
-│  MeetingNote    │
-└─────────────────┘
-        │
-        │ 1
-        │
-        │ 1
-┌─────────────────┐
-│    Meeting      │
-└─────────────────┘
-
-┌─────────────────┐       ┌─────────────────┐
-│    Engineer     │───────│ CareerProgress  │
-│                 │ 1   * │                 │
-└─────────────────┘       └─────────────────┘
-
-┌─────────────────┐
-│   CareerPath    │ (Reference data - R&D Career Path)
-└─────────────────┘
-```
-
-## Core Entities
-
-### Engineer
-
-The primary entity representing a direct report.
-
-```typescript
-interface Engineer {
-  // Identity
-  id: string;                    // Unique identifier
-  name: string;                  // Full name
-  email?: string;                // Work email (optional)
-  photoUrl?: string;             // Profile photo URL (optional)
-
-  // Employment
-  title: string;                 // Current job title
-  startDate: Date;               // When they joined the team
-  previousRoles?: string[];      // Previous roles/history
-  howTheyJoined?: string;        // Notes on how they joined
-
-  // 1-on-1 Settings
-  oneOnOneCadence: Cadence;      // Target meeting frequency
-  preferredDay?: DayOfWeek;      // Preferred day for 1-on-1s
-  preferredTime?: string;        // Preferred time slot
-
-  // Career
-  currentLevel: CareerLevel;     // Current career path level (P1-P5)
-  targetLevel?: CareerLevel;     // Target level they're working toward
-
-  // Attributes
-  seniorityCategory: SeniorityCategory;  // Junior/Mid/Senior
-  currentChallenges: ChallengeLevel;     // For smart frequency suggestions
-  performanceNotes?: string;             // Performance observations
-
-  // Personal Knowledge Base
-  personalInfo: PersonalInfo;
-
-  // Preferences
-  communicationStyle?: string;   // How they prefer to communicate
-  workHours?: string;            // Typical working hours
-  interests?: string[];          // Hobbies and interests
-
-  // Metadata
-  createdAt: Date;
-  updatedAt: Date;
-  isActive: boolean;             // Still on the team?
-}
-```
-
-### PersonalInfo (Embedded in Engineer)
-
-Personal details for the knowledge base.
-
-```typescript
-interface PersonalInfo {
-  // Family
-  partnerName?: string;
-  hasChildren: boolean;
-  childrenNames?: string[];
-  petInfo?: string;              // "Dog named Max", etc.
-
-  // Important Dates
-  birthday?: Date;
-  workAnniversary?: Date;        // Derived from startDate
-  otherDates?: ImportantDate[];  // Custom important dates
-
-  // Background
-  hometown?: string;
-  education?: string;
-  previousCompanies?: string[];
-
-  // Notes
-  personalNotes?: string;        // Free-form markdown notes
-}
-
-interface ImportantDate {
-  date: Date;
-  label: string;                 // "Wedding anniversary", etc.
-  recurring: boolean;            // Repeats yearly?
-}
-```
-
-### Meeting
-
-A scheduled or completed 1-on-1 meeting.
-
-```typescript
-interface Meeting {
-  id: string;
-  engineerId: string;            // Reference to Engineer
-
-  // Scheduling
-  scheduledDate: Date;
-  duration: number;              // Minutes
-  status: MeetingStatus;         // scheduled | completed | cancelled | skipped
-
-  // Completion
-  actualDate?: Date;             // When it actually happened
-  completedAt?: Date;            // When marked complete
-
-  // Metadata
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-type MeetingStatus = 'scheduled' | 'completed' | 'cancelled' | 'skipped';
-```
-
-### MeetingNote
-
-Markdown notes for a meeting.
-
-```typescript
-interface MeetingNote {
-  id: string;
-  meetingId: string;             // Reference to Meeting
-  engineerId: string;            // Reference to Engineer (denormalized)
-
-  // Content
-  content: string;               // Markdown content
-
-  // Optional Structure (extracted from content)
-  actionItems?: ActionItem[];    // Parsed action items
-
-  // Metadata
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface ActionItem {
-  id: string;
-  text: string;
-  isCompleted: boolean;
-  dueDate?: Date;
-  owner?: string;                // "me" or engineer name
-}
-```
-
-### MoodEntry
-
-A mood/health observation.
-
-```typescript
-interface MoodEntry {
-  id: string;
-  engineerId: string;            // Reference to Engineer
-
-  // Mood Data
-  score: MoodScore;              // 1-5 scale
-  context?: MoodContext;         // What prompted the observation
-  notes?: string;                // Additional notes
-
-  // Timing
-  recordedAt: Date;              // When observation was recorded
-  observedAt?: Date;             // When the mood was observed (if different)
-
-  // Metadata
-  createdAt: Date;
-}
-
-type MoodScore = 1 | 2 | 3 | 4 | 5;
-
-type MoodContext =
-  | 'one_on_one'                 // Observed during 1-on-1
-  | 'team_meeting'               // Observed in team meeting
-  | 'daily_standup'              // Observed in standup
-  | 'casual_chat'                // Informal observation
-  | 'weekly_reflection'          // Manager's weekly reflection
-  | 'other';
-```
-
-### CareerProgress
-
-Tracks progress on career path skills/pillars.
-
-```typescript
-interface CareerProgress {
-  id: string;
-  engineerId: string;            // Reference to Engineer
-
-  // Career Path Reference
-  pillar: CareerPillar;          // Which pillar of the career path
-  skill: string;                 // Specific skill within pillar
-
-  // Assessment
-  currentProficiency: ProficiencyLevel;
-  targetProficiency?: ProficiencyLevel;
-
-  // Evidence
-  notes?: string;                // Markdown notes on progress
-  lastAssessedAt: Date;
-
-  // Metadata
-  createdAt: Date;
-  updatedAt: Date;
-}
-```
-
-## Enumerations
-
-### Cadence (1-on-1 Frequency)
-
-```typescript
-type Cadence =
-  | 'weekly'           // Every week
-  | 'biweekly'         // Every 2 weeks
-  | 'monthly'          // Every month
-  | 'quarterly'        // Every quarter
-  | 'custom';          // Custom interval (days)
-
-interface CadenceConfig {
-  type: Cadence;
-  customDays?: number; // Only for 'custom' type
-}
-```
-
-### Career Path Levels
-
-Based on the R&D Career Path structure.
-
-```typescript
-type CareerLevel = 'P1' | 'P2' | 'P3' | 'P4' | 'P5';
-
-type CareerPillar =
-  | 'technical_skills'
-  | 'delivery'
-  | 'collaboration'
-  | 'leadership';
-
-type ProficiencyLevel =
-  | 'learning'         // Just starting
-  | 'developing'       // Making progress
-  | 'proficient'       // Meets expectations
-  | 'advanced'         // Exceeds expectations
-  | 'expert';          // Role model
-```
-
-### Seniority Categories
-
-```typescript
-type SeniorityCategory = 'junior' | 'mid' | 'senior' | 'staff';
-
-type ChallengeLevel = 'low' | 'medium' | 'high' | 'critical';
-```
-
-### Days of Week
-
-```typescript
-type DayOfWeek =
-  | 'monday'
-  | 'tuesday'
-  | 'wednesday'
-  | 'thursday'
-  | 'friday';
-```
-
-## Computed Properties
-
-### Engineer Computed Fields
-
-```typescript
-// These are derived, not stored
-interface EngineerComputed {
-  // 1-on-1 Status
-  lastOneOnOneDate: Date | null;
-  daysSinceLastOneOnOne: number;
-  isOverdue: boolean;
-  daysUntilOverdue: number;
-  nextSuggestedDate: Date;
-
-  // Mood
-  currentMood: MoodScore | null;     // Most recent
-  moodTrend: 'improving' | 'stable' | 'declining' | 'unknown';
-  averageMood30Days: number | null;
-
-  // Career
-  timeInCurrentLevel: number;        // Months
-  progressToNextLevel: number;       // Percentage (0-100)
-
-  // Tenure
-  tenureMonths: number;
-  upcomingAnniversary: Date | null;
-  upcomingBirthday: Date | null;
-}
-```
-
-## Data Storage
-
-### Folder-Based Workspaces
-
-Each team is stored in its own folder (like an Obsidian vault). The app opens a folder and treats it as the workspace:
-
-```
-my-team/                     # Any folder becomes a Vibe Manager workspace
-├── .vibe-manager.json       # Workspace marker + settings
-├── data/
-│   ├── engineers.json       # All engineer records
-│   ├── meetings.json        # All meeting records
-│   ├── mood_entries.json    # All mood observations
-│   └── career_progress.json # All career tracking entries
-└── notes/
-    ├── alex-chen/
-    │   ├── 2026-01-15.md    # Meeting notes by date
-    │   ├── 2026-01-22.md
-    │   └── personal.md      # Free-form personal notes
-    ├── jordan-lee/
-    │   └── ...
-    └── ...
-```
-
-### Multi-Team Support
-
-Users can manage multiple teams by having separate folders:
-
-```
-~/work/
-├── platform-team/           # One team
-│   ├── .vibe-manager.json
-│   ├── data/
-│   └── notes/
-├── mobile-team/             # Another team
-│   ├── .vibe-manager.json
-│   ├── data/
-│   └── notes/
+my-team/                         # Workspace root
+├── .vibe-manager                # Workspace marker + config (YAML)
+├── alex-chen/
+│   ├── _profile.md              # Engineer data + personal info
+│   ├── 2026-01-15.md            # Meeting note
+│   ├── 2026-01-22.md
+│   └── ...
+├── jordan-lee/
+│   ├── _profile.md
+│   └── ...
 └── ...
 ```
 
-**Usage:**
+**That's it.** No `data/` folder, no JSON files.
+
+## File Formats
+
+### .vibe-manager
+
+Workspace marker and configuration. Plain YAML file.
+
+```yaml
+# Vibe Manager workspace
+version: 1
+
+settings:
+  default_cadence: biweekly
+  overdue_threshold_days: 3
+```
+
+The presence of this file marks a directory as a Vibe Manager workspace.
+
+### {engineer-slug}/_profile.md
+
+All engineer data lives here. Frontmatter for structured fields, markdown for notes.
+
+```markdown
+---
+name: Alex Chen
+title: Software Engineer
+start_date: 2024-03-15
+level: P3
+cadence: weekly
+active: true
+
+# Personal
+birthday: 1992-05-20
+partner: Sarah
+children: [Emma, Jack]
+
+# Career Progress
+skills:
+  technical:
+    code: proficient
+    architecture: advanced
+    security: developing
+    testing: proficient
+  delivery:
+    planning: proficient
+    ownership: advanced
+  collaboration:
+    communication: proficient
+    teamwork: proficient
+  leadership:
+    mentoring: developing
+    knowledge_sharing: proficient
+skills_updated: 2026-01-10
+---
+
+# Alex Chen
+
+## Background
+From Seattle. CS degree from UW. Previously at Stripe for 3 years.
+
+## Working Style
+- Prefers morning 1-on-1s
+- Appreciates direct feedback
+- Interested in system design and architecture
+
+## Notes
+Mentioned wanting to explore tech lead path eventually. Has been
+particularly engaged since joining the payments project.
+```
+
+### {engineer-slug}/{date}.md
+
+Meeting notes. Filename is the date. Optional mood in frontmatter.
+
+```markdown
+---
+mood: 4
+---
+
+# 1-on-1 - January 15, 2026
+
+## Discussion
+- Sprint progress looking good
+- Career goals - interested in tech lead track
+
+## Notes
+Alex seems energized about the new project. Discussed potential
+tech lead opportunities in Q2. Wants more exposure to system design.
+
+## Action Items
+- [ ] Share tech lead role description @me
+- [x] Review Alex's design doc
+- [ ] Schedule skip-level with Sarah @alex
+```
+
+**Frontmatter fields (all optional):**
+- `mood` - Morale observation 1-5
+
+**File exists = meeting happened.** No file = no meeting. No need for status field.
+
+## Derived Data (Computed at Runtime)
+
+These are NOT stored, calculated when needed:
+
+**Per Engineer:**
+- `last_meeting_date` - From most recent note file
+- `days_since_meeting` - Current date minus last meeting
+- `is_overdue` - days_since > cadence threshold
+- `mood_trend` - From recent note frontmatter mood values
+- `tenure_months` - From start_date
+
+**Workspace:**
+- `team_size` - Count of active engineers
+- `overdue_count` - Engineers past their cadence
+- `average_mood` - Mean of recent mood scores
+
+## Multi-Team Support
+
+Separate workspace folders for each team:
+
+```
+~/work/
+├── platform-team/
+│   ├── .vibe-manager
+│   ├── alex-chen/
+│   └── jordan-lee/
+└── mobile-team/
+    ├── .vibe-manager
+    └── sam-taylor/
+```
+
+**CLI Usage:**
 - `vibe-manager ./platform-team` - Open specific workspace
-- `vibe-manager .` - Open current directory as workspace
-- `vibe-manager init` - Initialize current directory as new workspace
+- `vibe-manager .` - Open current directory
+- `vibe-manager init` - Initialize new workspace
 
-### Design Principles
+## Design Principles
 
-| Principle | Implementation |
-|-----------|----------------|
-| **Human-readable** | JSON with pretty-printing, standard markdown |
-| **Git-friendly** | Text files that diff well, suitable for version control |
-| **No database server** | Plain files, no SQLite/Postgres needed |
-| **Easy backup** | Just copy the workspace folder |
-| **Portable** | Move/sync folder between machines, store in Dropbox, etc. |
-| **Multi-workspace** | Manage multiple teams in separate folders |
+| Principle | Benefit |
+|-----------|---------|
+| **Pure markdown** | No JSON, no database, just text files |
+| **Frontmatter = data** | Structured fields in readable YAML |
+| **Folders = engineers** | `ls` shows your team |
+| **Files = meetings** | `ls alex-chen/` shows meeting history |
+| **Git-friendly** | Everything diffs well |
+| **Editor-agnostic** | vim, VS Code, Obsidian, any tool works |
 
-### Markdown-Native Notes
+## Validation
 
-Meeting notes are stored as individual markdown files:
-- One file per meeting: `{engineer-slug}/{date}.md`
-- Files are directly editable in any text editor
-- Can be browsed/searched with standard Unix tools
-- Compatible with Obsidian, VS Code, vim, etc.
+**Profile (`_profile.md` frontmatter):**
+- `name` - required
+- `level` - P1 | P2 | P3 | P4 | P5
+- `cadence` - weekly | biweekly | monthly
+- `active` - true | false (default: true)
 
-### JSON Data Format
+**Meeting note (`{date}.md`):**
+- Filename - valid date: YYYY-MM-DD.md
+- `mood` - 1-5 (optional)
+- File exists = meeting happened
 
-Structured data uses JSON for simplicity:
-- Pretty-printed for human readability
-- Arrays of records with IDs for relationships
-- Easy to inspect, debug, and manually edit if needed
-- Standard format with wide tooling support
+**Skills:**
+- Proficiency values: learning | developing | proficient | advanced | expert
 
-## Data Validation Rules
+## Slug Rules
 
-### Engineer
-- `name` is required, non-empty
-- `startDate` must be in the past
-- `oneOnOneCadence` must be a valid cadence type
-- `currentLevel` must be a valid career level
-
-### Meeting
-- `scheduledDate` is required
-- `duration` must be positive (default: 30)
-- `engineerId` must reference valid Engineer
-
-### MoodEntry
-- `score` must be 1-5
-- `engineerId` must reference valid Engineer
-- `recordedAt` cannot be in the future
-
-### MeetingNote
-- `content` can be empty but must exist
-- `meetingId` must reference valid Meeting
+Folder name derived from engineer name:
+- Lowercase
+- Spaces → hyphens
+- Remove special characters
+- `"Alex Chen"` → `alex-chen/`
+- `"María García"` → `maria-garcia/`

@@ -27,7 +27,7 @@ This roadmap outlines the phased development approach for Vibe Manager, from MVP
 | Feature | Description | Priority |
 |---------|-------------|----------|
 | Engineer profiles | Create/edit/archive team members | P0 |
-| 1-on-1 cadence | Set target frequency per engineer | P0 |
+| 1-on-1 frequency | Set target meeting frequency per engineer | P0 |
 | Overdue tracking | Visual indicators for missed meetings | P0 |
 | Record meetings | Mark 1-on-1s as complete with date | P0 |
 | Team dashboard | Overview of all engineers | P0 |
@@ -144,14 +144,14 @@ This roadmap outlines the phased development approach for Vibe Manager, from MVP
 
 | Feature | Description | Priority |
 |---------|-------------|----------|
-| Smart cadence | Suggest frequency based on seniority/challenges | P1 |
+| Smart frequency | Suggest meeting frequency based on seniority/challenges | P1 |
 | Weekly summary | Auto-generated weekly report | P1 |
 | Pattern detection | Alert on mood trends | P1 |
 | Meeting prep | Surface relevant context | P2 |
 | Templates | Note templates for common scenarios | P2 |
 
 ### Success Criteria
-- Receives useful suggestions for cadence
+- Receives useful suggestions for meeting frequency
 - Weekly summary helps with reflection
 - App proactively surfaces concerns
 

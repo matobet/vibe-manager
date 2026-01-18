@@ -22,16 +22,16 @@ This document contains prioritized user stories for Vibe Manager, organized by f
 
 Acceptance Criteria:
 - Dashboard shows overdue 1-on-1s prominently
-- Overdue defined as past the cadence threshold for that engineer
+- Overdue defined as past the meeting frequency threshold for that engineer
 - Clear visual distinction between overdue, due soon, and on track
 
-**US-102: Set Per-Engineer Cadence**
+**US-102: Set Per-Engineer Meeting Frequency**
 > As an EM, I want to set a different 1-on-1 frequency for each engineer, because junior engineers need more frequent check-ins than senior ones.
 
 Acceptance Criteria:
-- Can set weekly, bi-weekly, monthly, or custom cadence per engineer
-- Default cadence is configurable
-- Changing cadence updates overdue calculations immediately
+- Can set weekly, bi-weekly, monthly, or custom frequency per engineer
+- Default meeting frequency is configurable
+- Changing frequency updates overdue calculations immediately
 
 **US-103: Record a Completed 1-on-1**
 > As an EM, I want to mark a 1-on-1 as completed and add notes, so I have a record of our conversation.
@@ -43,11 +43,11 @@ Acceptance Criteria:
 - Updates "days since last 1-on-1" calculation
 
 **US-104: View Upcoming 1-on-1s**
-> As an EM, I want to see who I should meet with next based on their cadence, so I can plan my week.
+> As an EM, I want to see who I should meet with next based on their meeting frequency, so I can plan my week.
 
 Acceptance Criteria:
 - List of engineers sorted by "urgency" (how overdue/due soon)
-- Shows target date based on last meeting + cadence
+- Shows target date based on last meeting + frequency
 - Can filter to this week's priorities
 
 ### P1 - Enhanced Features
@@ -66,11 +66,11 @@ Acceptance Criteria:
 Acceptance Criteria:
 - Can mark as skipped with optional reason
 - Can reschedule to new date
-- Skipped meetings don't reset cadence tracking
+- Skipped meetings don't reset frequency tracking
 
 ### P2 - Future Enhancements
 
-**US-107: Smart Cadence Suggestions**
+**US-107: Smart Frequency Suggestions**
 > As an EM, I want the app to suggest meeting frequency based on engineer attributes, so I don't have to manually calibrate.
 
 Acceptance Criteria:
@@ -317,7 +317,7 @@ Acceptance Criteria:
 - Name (required)
 - Title, start date
 - Career level
-- 1-on-1 cadence
+- 1-on-1 meeting frequency
 
 **US-702: View Engineer Profile**
 > As an EM, I want to view all information about an engineer in one place, so I can prepare for conversations.
@@ -353,10 +353,10 @@ Acceptance Criteria:
 ### P0 - Core Functionality
 
 **US-801: Configure Defaults**
-> As an EM, I want to set default values (cadence, etc.), so new engineers have sensible starting points.
+> As an EM, I want to set default values (meeting frequency, etc.), so new engineers have sensible starting points.
 
 Acceptance Criteria:
-- Default 1-on-1 cadence
+- Default 1-on-1 meeting frequency
 - Default career level
 - Overdue threshold
 
@@ -368,7 +368,7 @@ Acceptance Criteria:
                     MVP (P0)                 Enhanced (P1)              Future (P2/P3)
                     --------                 -------------              --------------
 1-on-1s            View status              Schedule ahead             Smart suggestions
-                   Set cadence              Reschedule/skip            Calendar sync
+                   Set frequency            Reschedule/skip            Calendar sync
                    Record complete
                    View upcoming
 

@@ -8,7 +8,7 @@ The 1-on-1 Management feature is the core scheduling and tracking system for Vib
 
 ### Core Functionality
 
-- **Per-engineer cadence settings** - Different meeting frequencies for different people
+- **Per-engineer meeting frequency settings** - Different meeting frequencies for different people
 - **Overdue detection** - Visual alerts when meetings are past due
 - **Meeting lifecycle management** - Schedule, complete, reschedule, or skip meetings
 - **At-a-glance status** - Dashboard indicators for quick prioritization
@@ -27,11 +27,11 @@ Regular 1-on-1s are the foundation of effective people management. When an EM ma
 | Pain Point | How This Feature Helps |
 |------------|------------------------|
 | Meetings slip without noticing | Clear overdue indicators on dashboard |
-| One-size-fits-all cadence does not work | Per-engineer frequency settings |
+| One-size-fits-all meeting frequency does not work | Per-engineer frequency settings |
 | Uncertainty about who to meet next | Urgency-based prioritization |
 | No record of when meetings happened | Automatic tracking of meeting dates |
 | Calendar chaos when rescheduling | Built-in reschedule and skip tracking |
-| Forgetting to adjust for special circumstances | Manual overrides and custom cadences |
+| Forgetting to adjust for special circumstances | Manual overrides and custom meeting frequencys |
 
 ### User Goals
 
@@ -45,11 +45,11 @@ Regular 1-on-1s are the foundation of effective people management. When an EM ma
 
 ## 3. Functional Requirements
 
-### 3.1 Per-Engineer Cadence Settings
+### 3.1 Per-Engineer Meeting Frequency Settings
 
-Each engineer can have an individual meeting cadence configured.
+Each engineer can have an individual meeting meeting frequency configured.
 
-| Cadence Option | Interval | Typical Use Case |
+| Meeting Frequency Option | Interval | Typical Use Case |
 |----------------|----------|------------------|
 | Weekly | 7 days | Junior engineers, high challenges, performance concerns |
 | Bi-weekly | 14 days | Most mid-level engineers (default) |
@@ -58,10 +58,10 @@ Each engineer can have an individual meeting cadence configured.
 | Custom | N days | Special circumstances |
 
 **Behaviors:**
-- Default cadence is configurable in settings (recommended: bi-weekly)
-- Changing cadence recalculates overdue status immediately
-- Custom cadence allows any number of days (minimum: 1, maximum: 365)
-- Cadence is stored on the Engineer entity as `oneOnOneCadence`
+- Default meeting frequency is configurable in settings (recommended: bi-weekly)
+- Changing meeting frequency recalculates overdue status immediately
+- Custom meeting frequency allows any number of days (minimum: 1, maximum: 365)
+- Meeting Frequency is stored on the Engineer entity as `oneOnOneMeeting Frequency`
 
 ### 3.2 Tracking Last Meeting Date and Days Since
 
@@ -70,7 +70,7 @@ The system tracks when the last 1-on-1 occurred for each engineer.
 **Computed Fields:**
 - `lastOneOnOneDate` - Date of most recent completed meeting
 - `daysSinceLastOneOnOne` - Integer days since last meeting
-- `nextSuggestedDate` - Calculated as lastOneOnOneDate + cadence interval
+- `nextSuggestedDate` - Calculated as lastOneOnOneDate + meeting frequency interval
 
 **Display Logic:**
 ```
@@ -83,14 +83,14 @@ If no meetings exist:
 
 ### 3.3 Overdue Detection
 
-A meeting is considered overdue when the days since last meeting exceeds the engineer's cadence.
+A meeting is considered overdue when the days since last meeting exceeds the engineer's meeting frequency.
 
 **Overdue Calculation:**
 ```
-isOverdue = daysSinceLastOneOnOne > cadenceInDays
+isOverdue = daysSinceLastOneOnOne > meeting frequencyInDays
 
-daysOverdue = daysSinceLastOneOnOne - cadenceInDays
-daysUntilOverdue = cadenceInDays - daysSinceLastOneOnOne
+daysOverdue = daysSinceLastOneOnOne - meeting frequencyInDays
+daysUntilOverdue = meeting frequencyInDays - daysSinceLastOneOnOne
 ```
 
 **Status Categories:**
@@ -137,18 +137,18 @@ When a meeting is completed, it updates tracking and allows note-taking.
 **Reschedule:**
 - Change `scheduledDate` to a new date
 - Meeting remains in `scheduled` status
-- Does not affect cadence tracking
+- Does not affect meeting frequency tracking
 
 **Skip:**
 - Set `status` to `skipped`
 - Optional reason field (stored as note)
-- Skipped meetings do NOT reset cadence tracking
+- Skipped meetings do NOT reset meeting frequency tracking
 - Useful for: PTO, holidays, conflict weeks, engineer preference
 
 **Cancel:**
 - Set `status` to `cancelled`
 - Similar to skip but typically means meeting will not be rescheduled
-- Does not reset cadence tracking
+- Does not reset meeting frequency tracking
 
 ---
 
@@ -156,7 +156,7 @@ When a meeting is completed, it updates tracking and allows note-taking.
 
 ### 4.1 Factors Affecting Meeting Frequency
 
-The appropriate 1-on-1 cadence depends on several factors about the engineer:
+The appropriate 1-on-1 meeting frequency depends on several factors about the engineer:
 
 | Factor | Data Source | Impact on Frequency |
 |--------|-------------|---------------------|
@@ -168,7 +168,7 @@ The appropriate 1-on-1 cadence depends on several factors about the engineer:
 
 ### 4.2 Seniority-Based Defaults
 
-| Seniority | Recommended Cadence | Rationale |
+| Seniority | Recommended Meeting Frequency | Rationale |
 |-----------|---------------------|-----------|
 | Junior (P1-P2) | Weekly | More guidance needed, faster feedback loops |
 | Mid (P3) | Bi-weekly | Balance of autonomy and support |
@@ -179,25 +179,25 @@ The appropriate 1-on-1 cadence depends on several factors about the engineer:
 
 | Challenge Level | Adjustment | Scenarios |
 |-----------------|------------|-----------|
-| Low | Maintain or extend cadence | Stable, executing well |
-| Medium | Maintain cadence | Normal workload, typical challenges |
+| Low | Maintain or extend meeting frequency | Stable, executing well |
+| Medium | Maintain meeting frequency | Normal workload, typical challenges |
 | High | Consider weekly | Difficult project, learning curve, conflict |
 | Critical | Weekly or more | Performance concern, burnout risk, major blocker |
 
 ### 4.4 Performance Support
 
 When there are performance concerns (indicated by `performanceNotes` being populated or explicit flag):
-- Suggest weekly cadence regardless of seniority
+- Suggest weekly meeting frequency regardless of seniority
 - Provide more structure and documentation
 - Track progress more closely
 
 ### 4.5 Future Enhancement: Smart Suggestions
 
 **Planned Feature (P2):**
-The system will suggest cadence adjustments based on:
+The system will suggest meeting frequency adjustments based on:
 - Engineer attributes changing (e.g., challenges increased)
 - Patterns in mood tracking (declining mood = suggest more frequent)
-- Time since last cadence review
+- Time since last meeting frequency review
 - Approaching milestones (anniversary, level change)
 
 **Suggestion UI:**
@@ -223,7 +223,7 @@ Current: Bi-weekly | Suggested: Weekly
 |                                          |
 |  1-on-1: [RED] 5 days overdue            |
 |  Last: Jan 10 (12 days ago)              |
-|  Cadence: Bi-weekly                      |
+|  Meeting Frequency: Bi-weekly                      |
 |                                          |
 |  [Quick Complete] [Schedule] [View]      |
 +------------------------------------------+
@@ -288,7 +288,7 @@ Time: [2:00 PM         ] (optional)
 Duration: [30 min      ] (dropdown)
 
 Suggested: Friday (Sarah's preferred day)
-Next due: Jan 24 (based on bi-weekly cadence)
+Next due: Jan 24 (based on bi-weekly meeting frequency)
 
 [Cancel] [Schedule]
 ```
@@ -327,7 +327,7 @@ From the Engineer entity:
 
 | Field | Usage in 1-on-1 Management |
 |-------|----------------------------|
-| `oneOnOneCadence` | Target frequency setting |
+| `oneOnOneMeeting Frequency` | Target frequency setting |
 | `preferredDay` | Scheduling suggestions |
 | `preferredTime` | Scheduling suggestions |
 | `seniorityCategory` | Smart frequency recommendations |
@@ -343,9 +343,9 @@ From EngineerComputed:
 |----------|-------------|
 | `lastOneOnOneDate` | Most recent completed meeting date |
 | `daysSinceLastOneOnOne` | Days between today and last meeting |
-| `isOverdue` | daysSince > cadenceInDays |
-| `daysUntilOverdue` | cadenceInDays - daysSince |
-| `nextSuggestedDate` | lastMeeting + cadenceInterval |
+| `isOverdue` | daysSince > meeting frequencyInDays |
+| `daysUntilOverdue` | meeting frequencyInDays - daysSince |
+| `nextSuggestedDate` | lastMeeting + meeting frequencyInterval |
 
 ### 6.4 Database Indexes
 
@@ -378,12 +378,12 @@ For efficient queries:
 **Handling:**
 - Consider adding "return from leave" meeting type
 - Do not count leave period as "overdue" time
-- Option: Pause cadence tracking during leave (future feature)
+- Option: Pause meeting frequency tracking during leave (future feature)
 - Practical MVP: Manager manually adjusts or skips during leave
 
-### 7.3 Cadence Changes
+### 7.3 Meeting Frequency Changes
 
-**Scenario:** Manager changes cadence from weekly to monthly.
+**Scenario:** Manager changes meeting frequency from weekly to monthly.
 
 **Handling:**
 - Overdue status recalculates immediately
@@ -416,7 +416,7 @@ For efficient queries:
 - Archive engineer (set `isActive: false`)
 - Meeting history preserved
 - If they return, reactivate and resume tracking
-- Consider fresh start vs. continuing cadence
+- Consider fresh start vs. continuing meeting frequency
 
 ### 7.7 Holiday Weeks
 
@@ -424,12 +424,12 @@ For efficient queries:
 
 **Handling:**
 - Use skip functionality with "Holiday" reason
-- Cadence continues but skip is documented
+- Meeting Frequency continues but skip is documented
 - Alternative: Manager can adjust expected date manually (future feature)
 
 ### 7.8 Very Overdue Meetings
 
-**Scenario:** Meeting is extremely overdue (e.g., 30+ days past weekly cadence).
+**Scenario:** Meeting is extremely overdue (e.g., 30+ days past weekly meeting frequency).
 
 **Handling:**
 - Show escalated visual warning
@@ -455,12 +455,12 @@ This feature implements the following user stories from the product backlog:
 | Story ID | Title | Priority |
 |----------|-------|----------|
 | US-101 | View 1-on-1 Status | P0 |
-| US-102 | Set Per-Engineer Cadence | P0 |
+| US-102 | Set Per-Engineer Meeting Frequency | P0 |
 | US-103 | Record a Completed 1-on-1 | P0 |
 | US-104 | View Upcoming 1-on-1s | P0 |
 | US-105 | Schedule a 1-on-1 | P1 |
 | US-106 | Reschedule or Skip a 1-on-1 | P1 |
-| US-107 | Smart Cadence Suggestions | P2 |
+| US-107 | Smart Meeting Frequency Suggestions | P2 |
 
 ---
 
@@ -469,7 +469,7 @@ This feature implements the following user stories from the product backlog:
 ### MVP Scope
 
 For initial release, focus on:
-1. Cadence settings per engineer
+1. Meeting Frequency settings per engineer
 2. Recording completed meetings (one-click)
 3. Dashboard overdue indicators
 4. Days since tracking
@@ -480,7 +480,7 @@ For initial release, focus on:
 - Smart frequency suggestions
 - Calendar integration
 - Reminders and notifications
-- Pause cadence during leave
+- Pause meeting frequency during leave
 - Meeting agenda templates
 
 ### Technical Considerations

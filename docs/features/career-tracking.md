@@ -375,7 +375,7 @@ Include optional career discussion section in meeting notes:
 - Auto-suggest updating proficiency after noting relevant evidence
 - View meeting notes that mention specific skills when reviewing assessments
 
-### 7.4 Career Conversation Cadence
+### 7.4 Career Conversation Meeting Frequency
 
 Suggest periodic career-focused 1-on-1s:
 - Monthly: Quick check on development goal progress

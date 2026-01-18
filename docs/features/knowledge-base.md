@@ -174,9 +174,9 @@ The engineer profile page should organize Knowledge Base information into clear,
 
 ```
 +----------------------------------+
-|  [Photo]  Engineer Name          |
-|           Senior Engineer        |
-|           3 years, 2 months      |
+|  ★ P3   Engineer Name            |
+|         Senior Engineer          |
+|         3 years, 2 months        |
 +----------------------------------+
 
 +----------------------------------+
@@ -235,7 +235,7 @@ A dashboard component showing upcoming important dates:
 | Upcoming Dates                   |
 +----------------------------------+
 | TODAY                            |
-|   [avatar] Alex - Birthday       |
+|   🎂 Alex - Birthday             |
 +----------------------------------+
 | THIS WEEK                        |
 |   Jan 22 - Jordan - 3yr Anniv    |
@@ -249,7 +249,7 @@ A dashboard component showing upcoming important dates:
 
 **Design considerations:**
 - Visual hierarchy emphasizes today and this week
-- Avatars for quick recognition
+- Color-coded names for quick recognition (each engineer has a distinct color)
 - Clicking navigates to engineer profile
 - Configurable look-ahead window (7, 14, 30 days)
 

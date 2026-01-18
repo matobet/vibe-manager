@@ -19,7 +19,7 @@ Vibe Manager is a **terminal-based application (TUI)** designed to help engineer
 
 ### What Vibe Manager Does
 
-1. **Never forget a 1-on-1** - Tracks meeting cadence per engineer with smart reminders
+1. **Never forget a 1-on-1** - Tracks meeting frequency per engineer with smart reminders
 2. **Career path visibility** - Integrates with your R&D Career Path to track progress
 3. **Organized meeting notes** - Markdown-native notes that align with existing workflows
 4. **Personal knowledge base** - Remember the important details about each person
@@ -36,7 +36,7 @@ Vibe Manager is a **terminal-based application (TUI)** designed to help engineer
 
 | Pain Point | Solution |
 |------------|----------|
-| Forgetting 1-on-1s or letting them slip | Per-engineer cadence tracking with overdue alerts |
+| Forgetting 1-on-1s or letting them slip | Per-engineer frequency tracking with overdue alerts |
 | Losing track of career progress | Career path integration with progress indicators |
 | Scattered notes across tools | Centralized, markdown-native note management |
 | Forgetting personal details | Structured knowledge base for family/background info |
@@ -66,7 +66,7 @@ Vibe Manager is a **terminal-based application (TUI)** designed to help engineer
 
 ### 5. Flexible, Not Prescriptive
 - Adapt to your workflow, not the other way around
-- Per-engineer customization (cadence, categories)
+- Per-engineer customization (meeting frequency, categories)
 - Free-form notes with optional structure
 
 ## UX Vision: 8-Bit RPG Aesthetic via TUI
@@ -129,7 +129,7 @@ Your team of engineers is your **party of characters**:
 
 - Engineer profile management (2-10 people)
 - 1-on-1 scheduling and tracking
-- Per-engineer meeting cadence settings
+- Per-engineer meeting frequency settings
 - Markdown note-taking for meetings
 - Simple mood tracking (1-5 scale)
 - Career path progress tracking

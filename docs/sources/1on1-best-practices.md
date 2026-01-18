@@ -40,7 +40,7 @@ Junior engineers and new hires require more frequent touchpoints:
 | First 2 weeks | Daily brief check-ins | Orientation, immediate questions, psychological safety |
 | Weeks 3-8 | Weekly (45-60 min) | Onboarding progress, technical ramp-up, cultural integration |
 | Months 3-6 | Weekly (30-45 min) | Skill development, increasing autonomy, early career planning |
-| After 6 months | Weekly to bi-weekly | Transition to standard cadence based on performance |
+| After 6 months | Weekly to bi-weekly | Transition to standard meeting frequency based on performance |
 
 Key considerations for junior engineers:
 - Pair them with senior engineers for additional mentorship touchpoints [7]
@@ -49,13 +49,13 @@ Key considerations for junior engineers:
 
 ### Adapting for Senior and High-Performing Engineers
 
-Senior engineers often benefit from a different cadence:
+Senior engineers often benefit from a different meeting frequency:
 
 - A tenured high-performer might feel micromanaged by weekly meetings [6]
 - Monthly one-on-ones can work well for senior-level employees who prefer independence within their roles [9]
 - Worker autonomy is a key factor in determining appropriate frequency [6]
 
-**Best practice**: Rather than assuming, ask directly: "How do you feel about doing an hour every other week instead of 30 minutes weekly?" Giving them a say in the cadence immediately increases their ownership of the time [6].
+**Best practice**: Rather than assuming, ask directly: "How do you feel about doing an hour every other week instead of 30 minutes weekly?" Giving them a say in the meeting frequency immediately increases their ownership of the time [6].
 
 **Signs a senior engineer may need more frequent check-ins:**
 - Taking on a new technical leadership role
@@ -333,11 +333,11 @@ The meeting should feel like a safe space for honest conversation:
 4. [Pluralsight - Best Practices for 1:1s with Engineering Teams](https://www.pluralsight.com/resources/blog/software-development/best-practices-for-effective-meetings) - Engineering manager best practices
 5. [The Engineering Manager - 1 to 1s](https://www.theengineeringmanager.com/management-101/121s/) - Duration and structure recommendations
 
-### Frequency and Cadence
+### Frequency and Meeting Frequency
 6. [Fellow.app - How Often Should Engineers Have 1:1s](https://fellow.app/blog/engineering/how-often-should-engineers-have-one-on-ones/) - Meeting frequency research
 7. [CodePath - Onboarding Engineers](https://www.codepath.org/news/engineering-onboarding-guide) - Junior engineer onboarding
 8. [Elevano - Onboarding Engineers in High-Growth Startups](https://www.elevano.com/blog/effectively-onboarding-new-engineers/) - Weekly feedback during onboarding
-9. [MeetingNotes.com - One-on-One Meeting Cadence](https://meetingnotes.com/blog/one-on-one-meeting-cadence) - Frequency guidelines
+9. [MeetingNotes.com - One-on-One Meeting Meeting Frequency](https://meetingnotes.com/blog/one-on-one-meeting-meeting frequency) - Frequency guidelines
 
 ### Frameworks
 10. [Manager Tools - One-On-One Meetings Guide](https://www.manager-tools.com/one-on-one-meetings-guide) - The 10/10/10 format

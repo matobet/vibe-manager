@@ -407,7 +407,7 @@ Use the OKR (Objectives and Key Results) framework for career development:
 
 **Frequency and Format:**
 
-| Cadence | Purpose | Format |
+| Meeting Frequency | Purpose | Format |
 |---------|---------|--------|
 | Weekly | Progress check-in | Quick 1:1 discussion |
 | Monthly | Skill focus review | Targeted conversation on growth area |

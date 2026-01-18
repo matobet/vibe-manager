@@ -40,7 +40,7 @@ Workspace marker and configuration. Plain YAML file.
 version: 1
 
 settings:
-  default_cadence: biweekly
+  default_meeting_frequency: biweekly
   overdue_threshold_days: 3
 ```
 
@@ -56,7 +56,7 @@ name: Alex Chen
 title: Software Engineer
 start_date: 2024-03-15
 level: P3
-cadence: weekly
+meeting_frequency: weekly    # weekly | biweekly | monthly
 active: true
 
 # Personal
@@ -81,6 +81,9 @@ skills:
     mentoring: developing
     knowledge_sharing: proficient
 skills_updated: 2026-01-10
+
+# Display Color (auto-generated from name hash if not set)
+color: "#6495ED"
 ---
 
 # Alex Chen
@@ -135,13 +138,27 @@ These are NOT stored, calculated when needed:
 **Per Engineer:**
 - `last_meeting_date` - From most recent note file
 - `days_since_meeting` - Current date minus last meeting
-- `is_overdue` - days_since > cadence threshold
-- `mood_trend` - From recent note frontmatter mood values
-- `tenure_months` - From start_date
+- `is_overdue` - days_since > meeting frequency threshold
+- `mood_trend` - From recent note frontmatter mood values (Rising/Stable/Falling)
+- `recent_mood` - Most recent mood score (1-5)
+- `urgency_score` - Composite score for sorting (higher = needs more attention)
+- `color` - Display color (from profile or auto-generated from name hash)
+
+**Urgency Score Calculation:**
+| Factor | Points |
+|--------|--------|
+| Never had a meeting | +100 |
+| Days overdue (past frequency + threshold) | +10 per day (max 80) |
+| Approaching due date (within 2 days) | +5 |
+| Low mood (1-2) | +20 |
+| Falling mood trend | +15 |
+| No mood data | +10 |
+
+Engineers are sorted by urgency score descending, so the person needing most attention appears first.
 
 **Workspace:**
 - `team_size` - Count of active engineers
-- `overdue_count` - Engineers past their cadence
+- `overdue_count` - Engineers past their meeting frequency
 - `average_mood` - Mean of recent mood scores
 
 ## Multi-Team Support
@@ -180,7 +197,7 @@ Separate workspace folders for each team:
 **Profile (`_profile.md` frontmatter):**
 - `name` - required
 - `level` - P1 | P2 | P3 | P4 | P5
-- `cadence` - weekly | biweekly | monthly
+- `meeting_frequency` - weekly | biweekly | monthly
 - `active` - true | false (default: true)
 
 **Meeting note (`{date}.md`):**

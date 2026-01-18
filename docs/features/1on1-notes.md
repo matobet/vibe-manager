@@ -319,7 +319,7 @@ The primary interface for writing and editing notes.
 List of all notes for an engineer.
 
 **Elements:**
-- Engineer name and photo header
+- Engineer name header with level badge
 - Sort toggle (newest/oldest)
 - Search box (search within this engineer's notes)
 - Note list items:
@@ -341,7 +341,7 @@ Global or per-engineer note search.
 - Search input field
 - Scope selector (All Engineers / Specific Engineer)
 - Results list:
-  - Engineer name and avatar
+  - Engineer name (color-coded)
   - Meeting date
   - Content snippet with match highlighted
 - Empty state for no results

@@ -16,9 +16,9 @@ The dashboard draws inspiration from **8-bit RPG party screens** - think Final F
 | Dashboard Element | RPG Inspiration |
 |-------------------|-----------------|
 | Team overview | Party management screen |
-| Engineer cards | Character stat cards |
+| Engineer cards | Character stat cards with color-coded borders |
 | Mood score (1-5) | HP bar / Morale meter |
-| Career level (P1-P5) | Character level with XP |
+| Career level (P1-P5) | Character level badge |
 | 1-on-1 status | Status effects (healthy, poisoned, low HP) |
 | Skills/proficiencies | Character stats (STR, INT, WIS...) |
 
@@ -64,7 +64,7 @@ These elements are **immediately visible** without any interaction:
 #### 1-on-1 Status
 | Status | Visual | Meaning |
 |--------|--------|---------|
-| Overdue | Red indicator | Past cadence threshold |
+| Overdue | Red indicator | Past meeting frequency threshold |
 | Due Soon | Yellow indicator | Within 3 days of threshold |
 | On Track | Green indicator | Not due yet |
 | Scheduled | Blue indicator | Future meeting set |
@@ -127,34 +127,47 @@ Color Coding:
 **Status Indicator Wireframe:**
 ```
  ┌──────────────────────────────────────────────────────────┐
- │  [Photo]  Alex Chen                             P3  Sr   │
- │           Software Engineer                              │
+ │  ★ P3  Alex Chen                                    Sr   │
+ │        Software Engineer                                 │
  │  ─────────────────────────────────────────────────────── │
  │  1-on-1: [RED] 5 days overdue     Mood: [YELLOW] 3 (↓)  │
  │          Last: Jan 5              Trend: Declining       │
  └──────────────────────────────────────────────────────────┘
 ```
 
-### 4.3 Sorting Options
+### 4.3 Sorting by Urgency Score
 
-**FR-403**: Support multiple sort criteria with persistent preference.
+**FR-403**: Engineers are sorted by a computed **urgency score** (highest first = needs most attention).
 
-| Sort Option | Sort Logic |
-|-------------|------------|
-| 1-on-1 Urgency (default) | Most overdue first, then by days until due |
-| Mood Score | Lowest mood first, then by declining trend |
-| Name | Alphabetical A-Z |
-| Tenure | Newest team members first |
+The urgency score combines multiple factors to surface engineers who need immediate attention:
 
-**Wireframe - Sort Control:**
+| Factor | Score | Rationale |
+|--------|-------|-----------|
+| Never had a meeting | +100 | New team members need onboarding priority |
+| Days overdue (past frequency + threshold) | +10 per day (max 80) | Longer overdue = more urgent |
+| Approaching due date (within 2 days) | +5 | Proactive reminder |
+| Low mood (1-2) | +20 | Struggling team members need support |
+| Falling mood trend | +15 | Declining morale is a warning sign |
+| No mood data | +10 | Unknown state needs check-in |
+
+**Example Urgency Scores:**
+| Scenario | Score | Breakdown |
+|----------|-------|-----------|
+| New hire, never met | 110 | 100 (never met) + 10 (no mood) |
+| 3 days overdue + falling mood | 45 | 30 (3×10) + 15 (falling) |
+| Low mood (2) + falling | 35 | 20 (low) + 15 (falling) |
+| Recently met, good mood | 0 | All healthy |
+| Approaching due, stable | 5 | Just the reminder |
+
+**Dashboard Order:**
+Engineers appear left-to-right, top-to-bottom by descending urgency score. The first card is always the person who most needs your attention right now.
+
 ```
- Sort by: [ 1-on-1 Urgency ▼ ]
-          ┌──────────────────┐
-          │ 1-on-1 Urgency   │ ← default, most urgent first
-          │ Mood Score       │
-          │ Name (A-Z)       │
-          │ Tenure           │
-          └──────────────────┘
+ ┌─────────────────────────────────────────────────────────────────────┐
+ │  ★ P2  New Hire       │  ★ P3  Alex (overdue) │  ★ P4  Jordan     │
+ │  Score: 110            │  Score: 45             │  Score: 5         │
+ │  Never met!            │  3 days over, mood ↓   │  Due in 2 days    │
+ └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 4.4 Filtering Options
@@ -234,15 +247,16 @@ Color Coding:
 
 ### 5.1 Engineer Card/Row
 
-The primary display unit for each team member, styled as an RPG character card.
+The primary display unit for each team member, styled as an RPG character card with a distinctive color border (derived from the engineer's name).
 
 **Card Layout - RPG Character Card Style:**
 ```
  ╔═══════════════════════════════════════════════════════════════════╗
- ║  ┌─────┐  ALEX CHEN                              ★ LV.3 Senior ║
- ║  │▓▓▓▓▓│  Software Engineer                                      ║
- ║  │▓▓▓▓▓│  Party member for 2y 3m                                 ║
- ║  └─────┘                                                          ║
+ ║  ┌───────────────────────────────────────────────────────────┐   ║
+ ║  │  ★ LV.3   ALEX CHEN                           Senior  ★  │   ║
+ ║  │           Software Engineer                               │   ║
+ ║  │           Party member for 2y 3m                          │   ║
+ ║  └───────────────────────────────────────────────────────────┘   ║
  ║  ─────────────────────────────────────────────────────────────── ║
  ║  MORALE  [████████░░] 4/5  ↑ improving                           ║
  ║  1-ON-1  [██░░░░░░░░] ⚠ 5 days overdue                          ║
@@ -389,7 +403,7 @@ Dashboard View
      │   ├── name, title, photoUrl
      │   ├── startDate → tenure calculation
      │   ├── currentLevel, seniorityCategory
-     │   └── oneOnOneCadence
+     │   └── oneOnOneMeeting Frequency
      │
      ├── Meeting entity (filtered by engineerId)
      │   ├── Most recent completed → lastOneOnOneDate
@@ -410,8 +424,8 @@ Dashboard View
 
 | Field | Calculation |
 |-------|-------------|
-| `daysOverdue` | `today - (lastOneOnOneDate + cadenceDays)` if positive |
-| `daysUntilDue` | `(lastOneOnOneDate + cadenceDays) - today` if positive |
+| `daysOverdue` | `today - (lastOneOnOneDate + meeting frequencyDays)` if positive |
+| `daysUntilDue` | `(lastOneOnOneDate + meeting frequencyDays) - today` if positive |
 | `oneOnOneStatus` | Derived from daysOverdue/daysUntilDue |
 | `currentMood` | Most recent MoodEntry.score |
 | `moodTrend` | Linear regression on last 5 entries or 30 days |

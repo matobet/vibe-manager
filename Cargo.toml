@@ -1,0 +1,46 @@
+[package]
+name = "vibe-manager"
+version = "0.1.0"
+edition = "2021"
+authors = ["Vibe Manager Team"]
+description = "TUI tool for engineering managers to track 1-on-1s and team health"
+license = "MIT"
+repository = "https://github.com/your-org/vibe-manager"
+keywords = ["tui", "management", "1-on-1", "terminal"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+# TUI framework
+ratatui = "0.29"
+crossterm = "0.28"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+
+# Date/Time
+chrono = { version = "0.4", features = ["serde"] }
+chrono-humanize = "0.2"
+
+# File system
+dirs = "5.0"
+walkdir = "2.0"
+
+# CLI
+clap = { version = "4.0", features = ["derive"] }
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Unicode/text handling
+unicode-width = "0.1"
+
+[dev-dependencies]
+tempfile = "3.0"
+insta = "1.0"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

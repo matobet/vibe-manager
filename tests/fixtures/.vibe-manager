@@ -1,0 +1,6 @@
+# Vibe Manager workspace
+version: 1
+
+settings:
+  default_meeting_frequency: biweekly
+  overdue_threshold_days: 3

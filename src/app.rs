@@ -1,19 +1,34 @@
 //! Application state and TEA (The Elm Architecture) runtime
 
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
-use ratatui::{
-    backend::CrosstermBackend,
-    Terminal,
-};
+use ratatui::{backend::CrosstermBackend, Terminal};
 
 use crate::model::{
-    compute_engineer_summary, compute_workspace_summary, Engineer,
-    EngineerSummary, Meeting, Workspace, WorkspaceSummary,
+    compute_engineer_summary, compute_workspace_summary, Engineer, EngineerSummary, Meeting,
+    Workspace, WorkspaceSummary,
 };
+
+/// Status message display duration
+const STATUS_MESSAGE_DURATION: Duration = Duration::from_secs(3);
+
+/// Default values for new engineer modal
+pub const DEFAULT_LEVEL: &str = "P3";
+pub const DEFAULT_MEETING_FREQUENCY: &str = "biweekly";
+
+/// Side effects that the update function can request
+/// This keeps the TEA pattern pure - update() returns what should happen,
+/// the runtime (main.rs) executes the effects
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Effect {
+    /// No side effect needed
+    None,
+    /// Spawn external editor for current meeting
+    SpawnEditor { is_new: bool },
+}
 use crate::storage;
 
 /// Application view modes
@@ -21,8 +36,9 @@ use crate::storage;
 pub enum ViewMode {
     Dashboard,
     EngineerDetail,
-    NoteEditor,
+    NoteViewer,
     NewEngineerModal,
+    DeleteConfirmModal,
     Help,
 }
 
@@ -46,28 +62,27 @@ pub enum Msg {
     ViewMeeting(usize),
     NewMeeting,
 
-    // Note editor actions
-    SaveNote,
+    // Note viewer actions
+    EditMeeting,
+    /// Edit meeting directly from list (index is display index, newest first)
+    EditMeetingFromList(usize),
     UpdateMood(u8),
-
-    // Cursor movement
-    CursorLeft,
-    CursorRight,
-    CursorUp,
-    CursorDown,
-    CursorHome,
-    CursorEnd,
-    DeleteChar,
+    ShowDeleteConfirm,
+    ConfirmDelete,
 
     // Modal actions
     ShowNewEngineer,
-    CreateEngineer { name: String, level: String, meeting_frequency: String },
+    CreateEngineer {
+        name: String,
+        level: String,
+        meeting_frequency: String,
+    },
     CancelModal,
 
     // Data refresh
     RefreshData,
 
-    // Input handling
+    // Input handling (for modals)
     Input(char),
     Backspace,
     Enter,
@@ -87,9 +102,8 @@ pub struct App {
     pub selected_engineer_index: Option<usize>,
     pub selected_meeting_index: Option<usize>,
 
-    // Editor state
+    // Note viewer state
     pub editor_content: String,
-    pub editor_cursor: usize,  // Cursor position in content
     pub editor_mood: Option<u8>,
 
     // Modal state
@@ -99,7 +113,8 @@ pub struct App {
 
     // App state
     pub should_quit: bool,
-    pub status_message: Option<String>,
+    pub status_message: Option<(String, Instant)>,
+    pub delete_from_list: bool, // Track if delete was initiated from meeting list
 }
 
 impl App {
@@ -123,13 +138,13 @@ impl App {
             selected_engineer_index: None,
             selected_meeting_index: None,
             editor_content: String::new(),
-            editor_cursor: 0,
             editor_mood: None,
             modal_input: String::new(),
             modal_field_index: 0,
             modal_fields: Vec::new(),
             should_quit: false,
             status_message: None,
+            delete_from_list: false,
         };
 
         app.load_data()?;
@@ -179,82 +194,162 @@ impl App {
         Ok(())
     }
 
+    /// Set a status message with automatic expiry timestamp
+    pub fn set_status(&mut self, message: impl Into<String>) {
+        self.status_message = Some((message.into(), Instant::now()));
+    }
+
+    /// Clear status message if it has expired
+    pub fn clear_expired_status(&mut self) {
+        if let Some((_, timestamp)) = &self.status_message {
+            if timestamp.elapsed() >= STATUS_MESSAGE_DURATION {
+                self.status_message = None;
+            }
+        }
+    }
+
+    /// Get current status message text (if not expired)
+    pub fn status_text(&self) -> Option<&str> {
+        self.status_message.as_ref().and_then(|(msg, timestamp)| {
+            if timestamp.elapsed() < STATUS_MESSAGE_DURATION {
+                Some(msg.as_str())
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Delete a meeting by engineer and meeting index
+    /// Returns Ok(()) on success, sets status message on error
+    pub fn delete_meeting(&mut self, eng_idx: usize, meet_idx: usize) -> Result<()> {
+        let meeting = &self.meetings_by_engineer[eng_idx][meet_idx];
+        let path = meeting.path.clone();
+
+        // Delete the file
+        std::fs::remove_file(&path)?;
+
+        // Remove from in-memory list
+        self.meetings_by_engineer[eng_idx].remove(meet_idx);
+        self.selected_meeting_index = None;
+
+        // Recompute summary for this engineer
+        let engineer = &self.engineers[eng_idx];
+        let meetings = &self.meetings_by_engineer[eng_idx];
+        self.summaries[eng_idx] = compute_engineer_summary(
+            engineer,
+            meetings,
+            self.workspace.config.settings.overdue_threshold_days,
+        );
+        self.workspace_summary = compute_workspace_summary(&self.summaries);
+
+        Ok(())
+    }
+
     /// Process a message and update state (TEA update function)
-    pub fn update(&mut self, msg: Msg) -> Result<()> {
-        match msg {
+    /// Returns an Effect that the runtime should execute
+    pub fn update(&mut self, msg: Msg) -> Result<Effect> {
+        let effect = match msg {
             Msg::Quit => {
                 self.should_quit = true;
+                Effect::None
             }
 
             Msg::Back => {
                 match self.view_mode {
                     ViewMode::EngineerDetail => {
+                        // Restore engineer selection for dashboard navigation
+                        if let Some(eng_idx) = self.selected_engineer_index {
+                            self.selected_index = eng_idx;
+                        }
                         self.view_mode = ViewMode::Dashboard;
                         self.selected_engineer_index = None;
                     }
-                    ViewMode::NoteEditor => {
+                    ViewMode::NoteViewer => {
                         self.view_mode = ViewMode::EngineerDetail;
                         self.selected_meeting_index = None;
                     }
                     ViewMode::Help | ViewMode::NewEngineerModal => {
                         self.view_mode = ViewMode::Dashboard;
                     }
+                    ViewMode::DeleteConfirmModal => {
+                        if self.delete_from_list {
+                            self.selected_meeting_index = None;
+                            self.view_mode = ViewMode::EngineerDetail;
+                        } else {
+                            self.view_mode = ViewMode::NoteViewer;
+                        }
+                    }
                     ViewMode::Dashboard => {}
                 }
+                Effect::None
             }
 
             Msg::ShowHelp => {
                 self.view_mode = ViewMode::Help;
+                Effect::None
             }
 
             Msg::HideHelp => {
                 self.view_mode = ViewMode::Dashboard;
+                Effect::None
             }
 
             Msg::SelectNext => {
-                if !self.engineers.is_empty() {
-                    self.selected_index = (self.selected_index + 1) % self.engineers.len();
+                let max_len = self.current_list_len();
+                if max_len > 0 {
+                    self.selected_index = (self.selected_index + 1) % max_len;
                 }
+                Effect::None
             }
 
             Msg::SelectPrev => {
-                if !self.engineers.is_empty() {
+                let max_len = self.current_list_len();
+                if max_len > 0 {
                     self.selected_index = if self.selected_index == 0 {
-                        self.engineers.len() - 1
+                        max_len - 1
                     } else {
                         self.selected_index - 1
                     };
                 }
+                Effect::None
             }
 
             Msg::SelectFirst => {
                 self.selected_index = 0;
+                Effect::None
             }
 
             Msg::SelectLast => {
-                if !self.engineers.is_empty() {
-                    self.selected_index = self.engineers.len() - 1;
+                let max_len = self.current_list_len();
+                if max_len > 0 {
+                    self.selected_index = max_len - 1;
                 }
+                Effect::None
             }
 
             Msg::ViewEngineer => {
                 if !self.engineers.is_empty() {
                     self.selected_engineer_index = Some(self.selected_index);
+                    self.selected_index = 0; // Reset for meeting navigation
                     self.view_mode = ViewMode::EngineerDetail;
                 }
+                Effect::None
             }
 
             Msg::ViewMeeting(index) => {
                 if let Some(eng_idx) = self.selected_engineer_index {
-                    if index < self.meetings_by_engineer[eng_idx].len() {
-                        self.selected_meeting_index = Some(index);
-                        let meeting = &self.meetings_by_engineer[eng_idx][index];
+                    let meetings_len = self.meetings_by_engineer[eng_idx].len();
+                    if index < meetings_len {
+                        // Convert display index to array index (display shows newest first)
+                        let actual_index = meetings_len - 1 - index;
+                        self.selected_meeting_index = Some(actual_index);
+                        let meeting = &self.meetings_by_engineer[eng_idx][actual_index];
                         self.editor_content = meeting.content.clone();
-                        self.editor_cursor = self.editor_content.len(); // Start at end
                         self.editor_mood = meeting.mood();
-                        self.view_mode = ViewMode::NoteEditor;
+                        self.view_mode = ViewMode::NoteViewer;
                     }
                 }
+                Effect::None
             }
 
             Msg::NewMeeting => {
@@ -263,50 +358,113 @@ impl App {
                     match storage::create_meeting(&engineer.path, None) {
                         Ok(meeting) => {
                             self.editor_content = meeting.content.clone();
-                            self.editor_cursor = self.editor_content.len(); // Start at end
                             self.editor_mood = None;
                             self.meetings_by_engineer[eng_idx].push(meeting);
                             self.selected_meeting_index =
                                 Some(self.meetings_by_engineer[eng_idx].len() - 1);
-                            self.view_mode = ViewMode::NoteEditor;
-                            self.status_message = Some("New meeting created".to_string());
+                            self.view_mode = ViewMode::NoteViewer;
+                            return Ok(Effect::SpawnEditor { is_new: true });
                         }
                         Err(e) => {
-                            self.status_message = Some(format!("Error: {}", e));
+                            self.set_status(format!("Error: {}", e));
                         }
                     }
                 }
+                Effect::None
             }
 
-            Msg::SaveNote => {
-                if let (Some(eng_idx), Some(meet_idx)) =
-                    (self.selected_engineer_index, self.selected_meeting_index)
-                {
-                    let meeting = &mut self.meetings_by_engineer[eng_idx][meet_idx];
-                    meeting.content = self.editor_content.clone();
-                    if let Some(mood) = self.editor_mood {
-                        meeting.frontmatter.mood = Some(mood);
-                    }
-                    if let Err(e) = storage::save_meeting(meeting) {
-                        self.status_message = Some(format!("Error saving: {}", e));
-                    } else {
-                        self.status_message = Some("Saved".to_string());
+            Msg::EditMeeting => Effect::SpawnEditor { is_new: false },
+
+            Msg::EditMeetingFromList(index) => {
+                if let Some(eng_idx) = self.selected_engineer_index {
+                    let meetings_len = self.meetings_by_engineer[eng_idx].len();
+                    if index < meetings_len {
+                        // Convert display index to array index (display shows newest first)
+                        let actual_index = meetings_len - 1 - index;
+                        self.selected_meeting_index = Some(actual_index);
+                        let meeting = &self.meetings_by_engineer[eng_idx][actual_index];
+                        self.editor_content = meeting.content.clone();
+                        self.editor_mood = meeting.mood();
+                        // Don't change view mode - go straight to editor
+                        return Ok(Effect::SpawnEditor { is_new: false });
                     }
                 }
+                Effect::None
             }
 
             Msg::UpdateMood(mood) => {
                 self.editor_mood = Some(mood);
+                // Save mood to disk immediately
+                if let (Some(eng_idx), Some(meet_idx)) =
+                    (self.selected_engineer_index, self.selected_meeting_index)
+                {
+                    let meeting = &mut self.meetings_by_engineer[eng_idx][meet_idx];
+                    meeting.frontmatter.mood = Some(mood);
+                    if let Err(e) = storage::save_meeting(meeting) {
+                        self.set_status(format!("Error saving mood: {}", e));
+                    } else {
+                        self.set_status("Mood updated");
+                    }
+                }
+                Effect::None
+            }
+
+            Msg::ShowDeleteConfirm => {
+                // Handle delete from both NoteViewer and EngineerDetail
+                if self.view_mode == ViewMode::NoteViewer {
+                    // Already viewing a meeting - selected_meeting_index already set
+                    self.delete_from_list = false;
+                    self.view_mode = ViewMode::DeleteConfirmModal;
+                } else if self.view_mode == ViewMode::EngineerDetail {
+                    // Deleting from the meeting list
+                    if let Some(eng_idx) = self.selected_engineer_index {
+                        let meetings_len = self.meetings_by_engineer[eng_idx].len();
+                        if self.selected_index < meetings_len {
+                            // Convert display index to array index (display shows newest first)
+                            let actual_index = meetings_len - 1 - self.selected_index;
+                            self.selected_meeting_index = Some(actual_index);
+                            self.delete_from_list = true;
+                            self.view_mode = ViewMode::DeleteConfirmModal;
+                        }
+                    }
+                }
+                Effect::None
+            }
+
+            Msg::ConfirmDelete => {
+                if let (Some(eng_idx), Some(meet_idx)) =
+                    (self.selected_engineer_index, self.selected_meeting_index)
+                {
+                    match self.delete_meeting(eng_idx, meet_idx) {
+                        Ok(()) => {
+                            self.view_mode = ViewMode::EngineerDetail;
+                            self.set_status("Meeting deleted");
+                        }
+                        Err(e) => {
+                            self.set_status(format!("Error deleting meeting: {}", e));
+                        }
+                    }
+                }
+                Effect::None
             }
 
             Msg::ShowNewEngineer => {
                 self.modal_input.clear();
                 self.modal_field_index = 0;
-                self.modal_fields = vec![String::new(), String::from("P3"), String::from("biweekly")];
+                self.modal_fields = vec![
+                    String::new(),
+                    String::from(DEFAULT_LEVEL),
+                    String::from(DEFAULT_MEETING_FREQUENCY),
+                ];
                 self.view_mode = ViewMode::NewEngineerModal;
+                Effect::None
             }
 
-            Msg::CreateEngineer { name, level, meeting_frequency } => {
+            Msg::CreateEngineer {
+                name,
+                level,
+                meeting_frequency,
+            } => {
                 let profile = crate::model::EngineerProfile {
                     name: name.clone(),
                     title: None,
@@ -325,58 +483,57 @@ impl App {
                 match storage::create_engineer(&self.workspace.path, &name, profile) {
                     Ok(_) => {
                         self.load_data()?;
-                        self.status_message = Some(format!("Created {}", name));
+                        self.set_status(format!("Created {}", name));
                     }
                     Err(e) => {
-                        self.status_message = Some(format!("Error: {}", e));
+                        self.set_status(format!("Error: {}", e));
                     }
                 }
                 self.view_mode = ViewMode::Dashboard;
+                Effect::None
             }
 
             Msg::CancelModal => {
-                self.view_mode = ViewMode::Dashboard;
-                self.modal_input.clear();
-                self.modal_fields.clear();
+                match self.view_mode {
+                    ViewMode::NewEngineerModal => {
+                        self.view_mode = ViewMode::Dashboard;
+                        self.modal_input.clear();
+                        self.modal_fields.clear();
+                    }
+                    ViewMode::DeleteConfirmModal => {
+                        if self.delete_from_list {
+                            self.selected_meeting_index = None;
+                            self.view_mode = ViewMode::EngineerDetail;
+                        } else {
+                            self.view_mode = ViewMode::NoteViewer;
+                        }
+                    }
+                    _ => {}
+                }
+                Effect::None
             }
 
             Msg::RefreshData => {
                 self.load_data()?;
+                Effect::None
             }
 
             Msg::Input(c) => {
-                if self.view_mode == ViewMode::NewEngineerModal {
-                    if self.modal_field_index < self.modal_fields.len() {
-                        self.modal_fields[self.modal_field_index].push(c);
-                    }
-                } else if self.view_mode == ViewMode::NoteEditor {
-                    // Insert at cursor position
-                    self.editor_content.insert(self.editor_cursor, c);
-                    self.editor_cursor += 1;
+                if self.view_mode == ViewMode::NewEngineerModal
+                    && self.modal_field_index < self.modal_fields.len()
+                {
+                    self.modal_fields[self.modal_field_index].push(c);
                 }
+                Effect::None
             }
 
             Msg::Backspace => {
-                if self.view_mode == ViewMode::NewEngineerModal {
-                    if self.modal_field_index < self.modal_fields.len() {
-                        self.modal_fields[self.modal_field_index].pop();
-                    }
-                } else if self.view_mode == ViewMode::NoteEditor {
-                    // Delete character before cursor
-                    if self.editor_cursor > 0 {
-                        self.editor_cursor -= 1;
-                        self.editor_content.remove(self.editor_cursor);
-                    }
+                if self.view_mode == ViewMode::NewEngineerModal
+                    && self.modal_field_index < self.modal_fields.len()
+                {
+                    self.modal_fields[self.modal_field_index].pop();
                 }
-            }
-
-            Msg::DeleteChar => {
-                if self.view_mode == ViewMode::NoteEditor {
-                    // Delete character at cursor
-                    if self.editor_cursor < self.editor_content.len() {
-                        self.editor_content.remove(self.editor_cursor);
-                    }
-                }
+                Effect::None
             }
 
             Msg::Enter => {
@@ -388,62 +545,18 @@ impl App {
                         let name = self.modal_fields[0].clone();
                         let level = self.modal_fields[1].clone();
                         let meeting_frequency = self.modal_fields[2].clone();
-                        self.update(Msg::CreateEngineer { name, level, meeting_frequency })?;
+                        return self.update(Msg::CreateEngineer {
+                            name,
+                            level,
+                            meeting_frequency,
+                        });
                     }
-                } else if self.view_mode == ViewMode::NoteEditor {
-                    // Insert newline at cursor position
-                    self.editor_content.insert(self.editor_cursor, '\n');
-                    self.editor_cursor += 1;
                 }
+                Effect::None
             }
+        };
 
-            Msg::CursorLeft => {
-                if self.editor_cursor > 0 {
-                    self.editor_cursor -= 1;
-                }
-            }
-
-            Msg::CursorRight => {
-                if self.editor_cursor < self.editor_content.len() {
-                    self.editor_cursor += 1;
-                }
-            }
-
-            Msg::CursorUp => {
-                // Move to same column on previous line
-                let (line, col) = self.cursor_line_col();
-                if line > 0 {
-                    let prev_line_start = self.line_start(line - 1);
-                    let prev_line_len = self.line_length(line - 1);
-                    self.editor_cursor = prev_line_start + col.min(prev_line_len);
-                }
-            }
-
-            Msg::CursorDown => {
-                // Move to same column on next line
-                let (line, col) = self.cursor_line_col();
-                let line_count = self.editor_content.lines().count();
-                if line + 1 < line_count {
-                    let next_line_start = self.line_start(line + 1);
-                    let next_line_len = self.line_length(line + 1);
-                    self.editor_cursor = next_line_start + col.min(next_line_len);
-                }
-            }
-
-            Msg::CursorHome => {
-                // Move to start of current line
-                let (line, _) = self.cursor_line_col();
-                self.editor_cursor = self.line_start(line);
-            }
-
-            Msg::CursorEnd => {
-                // Move to end of current line
-                let (line, _) = self.cursor_line_col();
-                self.editor_cursor = self.line_start(line) + self.line_length(line);
-            }
-        }
-
-        Ok(())
+        Ok(effect)
     }
 
     /// Get meetings for currently selected engineer
@@ -452,32 +565,13 @@ impl App {
             .and_then(|i| self.meetings_by_engineer.get(i))
     }
 
-    /// Get current cursor line and column
-    fn cursor_line_col(&self) -> (usize, usize) {
-        let before_cursor = &self.editor_content[..self.editor_cursor];
-        let line = before_cursor.matches('\n').count();
-        let last_newline = before_cursor.rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let col = self.editor_cursor - last_newline;
-        (line, col)
-    }
-
-    /// Get character offset for start of a line
-    fn line_start(&self, line: usize) -> usize {
-        if line == 0 {
-            return 0;
+    /// Get the length of the currently navigable list based on view mode
+    fn current_list_len(&self) -> usize {
+        match self.view_mode {
+            ViewMode::Dashboard => self.engineers.len(),
+            ViewMode::EngineerDetail => self.selected_meetings().map(|m| m.len()).unwrap_or(0),
+            _ => 0,
         }
-        self.editor_content
-            .match_indices('\n')
-            .nth(line - 1)
-            .map(|(i, _)| i + 1)
-            .unwrap_or(self.editor_content.len())
-    }
-
-    /// Get length of a line (not including newline)
-    fn line_length(&self, line: usize) -> usize {
-        let start = self.line_start(line);
-        let rest = &self.editor_content[start..];
-        rest.find('\n').unwrap_or(rest.len())
     }
 }
 
@@ -487,7 +581,6 @@ pub fn handle_key_event(app: &App, key: KeyEvent) -> Option<Msg> {
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         match key.code {
             KeyCode::Char('c') | KeyCode::Char('q') => return Some(Msg::Quit),
-            KeyCode::Char('s') => return Some(Msg::SaveNote),
             KeyCode::Char('r') => return Some(Msg::RefreshData),
             _ => {}
         }
@@ -512,9 +605,13 @@ pub fn handle_key_event(app: &App, key: KeyEvent) -> Option<Msg> {
 
         ViewMode::EngineerDetail => match key.code {
             KeyCode::Char('q') => Some(Msg::Quit),
-            KeyCode::Esc | KeyCode::Char('h') | KeyCode::Left => Some(Msg::Back),
+            KeyCode::Esc | KeyCode::Backspace | KeyCode::Char('h') | KeyCode::Left => {
+                Some(Msg::Back)
+            }
             KeyCode::Char('j') | KeyCode::Down => Some(Msg::SelectNext),
             KeyCode::Char('k') | KeyCode::Up => Some(Msg::SelectPrev),
+            KeyCode::Char('g') => Some(Msg::SelectFirst),
+            KeyCode::Char('G') => Some(Msg::SelectLast),
             KeyCode::Enter | KeyCode::Char('l') | KeyCode::Right => {
                 if app.selected_index < app.selected_meetings().map(|m| m.len()).unwrap_or(0) {
                     Some(Msg::ViewMeeting(app.selected_index))
@@ -522,31 +619,38 @@ pub fn handle_key_event(app: &App, key: KeyEvent) -> Option<Msg> {
                     None
                 }
             }
+            KeyCode::Char('e') => {
+                if app.selected_index < app.selected_meetings().map(|m| m.len()).unwrap_or(0) {
+                    Some(Msg::EditMeetingFromList(app.selected_index))
+                } else {
+                    None
+                }
+            }
             KeyCode::Char('n') => Some(Msg::NewMeeting),
+            KeyCode::Delete => Some(Msg::ShowDeleteConfirm),
             KeyCode::Char('?') => Some(Msg::ShowHelp),
             _ => None,
         },
 
-        ViewMode::NoteEditor => match key.code {
-            KeyCode::Esc => Some(Msg::Back),
-            // Cursor movement
-            KeyCode::Left => Some(Msg::CursorLeft),
-            KeyCode::Right => Some(Msg::CursorRight),
-            KeyCode::Up => Some(Msg::CursorUp),
-            KeyCode::Down => Some(Msg::CursorDown),
-            KeyCode::Home => Some(Msg::CursorHome),
-            KeyCode::End => Some(Msg::CursorEnd),
-            // Editing
-            KeyCode::Char(c) => Some(Msg::Input(c)),
-            KeyCode::Backspace => Some(Msg::Backspace),
-            KeyCode::Delete => Some(Msg::DeleteChar),
-            KeyCode::Enter => Some(Msg::Enter),
+        ViewMode::NoteViewer => match key.code {
+            KeyCode::Esc | KeyCode::Backspace => Some(Msg::Back),
+            KeyCode::Char('q') => Some(Msg::Quit),
+            // Edit with external editor
+            KeyCode::Char('e') => Some(Msg::EditMeeting),
+            // Delete meeting
+            KeyCode::Delete => Some(Msg::ShowDeleteConfirm),
             // Mood
             KeyCode::F(1) => Some(Msg::UpdateMood(1)),
             KeyCode::F(2) => Some(Msg::UpdateMood(2)),
             KeyCode::F(3) => Some(Msg::UpdateMood(3)),
             KeyCode::F(4) => Some(Msg::UpdateMood(4)),
             KeyCode::F(5) => Some(Msg::UpdateMood(5)),
+            _ => None,
+        },
+
+        ViewMode::DeleteConfirmModal => match key.code {
+            KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => Some(Msg::ConfirmDelete),
+            KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => Some(Msg::CancelModal),
             _ => None,
         },
 

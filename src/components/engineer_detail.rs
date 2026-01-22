@@ -10,7 +10,7 @@ use ratatui::{
 
 use crate::model::{Engineer, EngineerSummary, Meeting};
 use crate::theme::{
-    format_meeting_frequency, format_days_since, mood_color, mood_gauge, rpg_block, simple_block,
+    format_days_since, format_meeting_frequency, mood_color, mood_gauge, rpg_block, simple_block,
     style_header, style_muted, style_success, style_title,
 };
 
@@ -54,13 +54,11 @@ impl<'a> EngineerDetail<'a> {
 
         // Header with level badge: ★ P3  Engineer Name
         let level_badge = format!("★ {}", profile.level.as_deref().unwrap_or("-"));
-        let mut lines = vec![
-            Line::from(vec![
-                Span::styled(level_badge, Style::default().fg(self.summary.color)),
-                Span::raw("   "),
-                Span::styled(&profile.name, style_title()),
-            ]),
-        ];
+        let mut lines = vec![Line::from(vec![
+            Span::styled(level_badge, Style::default().fg(self.summary.color)),
+            Span::raw("   "),
+            Span::styled(&profile.name, style_title()),
+        ])];
 
         if let Some(title) = &profile.title {
             lines.push(Line::from(Span::styled(title, style_muted())));
@@ -71,7 +69,10 @@ impl<'a> EngineerDetail<'a> {
         // 1-on-1 frequency and status
         lines.push(Line::from(vec![
             Span::raw("Meeting Frequency: "),
-            Span::styled(format_meeting_frequency(&profile.meeting_frequency), style_success()),
+            Span::styled(
+                format_meeting_frequency(&profile.meeting_frequency),
+                style_success(),
+            ),
             Span::raw("  │  "),
             Span::raw("Last 1-on-1: "),
             Span::raw(format_days_since(
@@ -84,10 +85,7 @@ impl<'a> EngineerDetail<'a> {
         if let Some(mood) = self.summary.recent_mood {
             lines.push(Line::from(vec![
                 Span::raw("Mood: "),
-                Span::styled(
-                    mood_gauge(mood),
-                    Style::default().fg(mood_color(mood)),
-                ),
+                Span::styled(mood_gauge(mood), Style::default().fg(mood_color(mood))),
             ]));
         }
 
@@ -118,7 +116,10 @@ impl<'a> EngineerDetail<'a> {
                 Line::from(""),
                 Line::from("No meetings recorded yet"),
                 Line::from(""),
-                Line::from(Span::styled("Press 'n' to create a new meeting note", style_muted())),
+                Line::from(Span::styled(
+                    "Press 'n' to create a new meeting note",
+                    style_muted(),
+                )),
             ];
             let para = Paragraph::new(text)
                 .block(simple_block("Meeting History"))
@@ -138,14 +139,10 @@ impl<'a> EngineerDetail<'a> {
             .iter()
             .rev()
             .map(|m| {
-                let mood_display = m.mood().map_or_else(
-                    || "─────".to_string(),
-                    |mood| mood_gauge(mood),
-                );
-                let mood_style = m.mood().map_or(
-                    style_muted(),
-                    |mood| Style::default().fg(mood_color(mood)),
-                );
+                let mood_display = m.mood().map_or_else(|| "─────".to_string(), mood_gauge);
+                let mood_style = m
+                    .mood()
+                    .map_or(style_muted(), |mood| Style::default().fg(mood_color(mood)));
 
                 // Get first non-empty line as preview
                 let preview: String = m
@@ -174,15 +171,12 @@ impl<'a> EngineerDetail<'a> {
         let table = Table::new(rows, widths)
             .header(header)
             .block(simple_block("Meeting History"))
-            .row_highlight_style(
-                Style::default()
-                    .add_modifier(ratatui::style::Modifier::REVERSED)
-            );
+            .row_highlight_style(Style::default().add_modifier(ratatui::style::Modifier::REVERSED));
 
         let mut state = TableState::default();
-        // Adjust selection index since we reversed the list
+        // selected_meeting 0 = first row in display (newest meeting)
         if !self.meetings.is_empty() {
-            state.select(Some(self.meetings.len() - 1 - self.selected_meeting.min(self.meetings.len() - 1)));
+            state.select(Some(self.selected_meeting.min(self.meetings.len() - 1)));
         }
 
         frame.render_stateful_widget(table, area, &mut state);

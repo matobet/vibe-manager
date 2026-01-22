@@ -31,12 +31,12 @@ pub const COLOR_ACCENT: Color = Color::Magenta;
 
 // Status colors - colorblind-safe palette
 // Using Blue-Orange opposition instead of Red-Green
-pub const COLOR_SUCCESS: Color = Color::Cyan;      // Blue-ish for "good"
-pub const COLOR_WARNING: Color = Color::Yellow;    // Yellow for "attention"
-pub const COLOR_DANGER: Color = Color::Magenta;    // Magenta for "bad" (not red)
+pub const COLOR_SUCCESS: Color = Color::Cyan; // Blue-ish for "good"
+pub const COLOR_WARNING: Color = Color::Yellow; // Yellow for "attention"
+pub const COLOR_DANGER: Color = Color::Magenta; // Magenta for "bad" (not red)
 
 // Text colors with good contrast
-pub const COLOR_MUTED: Color = Color::Gray;        // Lighter than DarkGray
+pub const COLOR_MUTED: Color = Color::Gray; // Lighter than DarkGray
 pub const COLOR_TEXT: Color = Color::White;
 pub const COLOR_TEXT_DIM: Color = Color::Gray;
 
@@ -151,11 +151,11 @@ pub fn mood_color(value: u8) -> Color {
     // Using brightness/saturation instead of red-green hue shift
     // All users can perceive brightness differences
     match value {
-        1 => COLOR_DANGER,              // Magenta - distinct
-        2 => Color::LightMagenta,       // Lighter magenta
-        3 => COLOR_WARNING,             // Yellow - neutral
-        4 => Color::LightCyan,          // Light cyan
-        5 => COLOR_SUCCESS,             // Cyan - positive
+        1 => COLOR_DANGER,        // Magenta - distinct
+        2 => Color::LightMagenta, // Lighter magenta
+        3 => COLOR_WARNING,       // Yellow - neutral
+        4 => Color::LightCyan,    // Light cyan
+        5 => COLOR_SUCCESS,       // Cyan - positive
         _ => COLOR_MUTED,
     }
 }
@@ -164,26 +164,26 @@ pub fn mood_color(value: u8) -> Color {
 // Status Icons - Always pair with text/color
 // ═══════════════════════════════════════════════════════════════
 
-pub const ICON_OK: &str = "✓";           // Checkmark - universally understood
-pub const ICON_WARNING: &str = "⚠";      // Warning triangle
-pub const ICON_DANGER: &str = "✗";       // X mark
+pub const ICON_OK: &str = "✓"; // Checkmark - universally understood
+pub const ICON_WARNING: &str = "⚠"; // Warning triangle
+pub const ICON_DANGER: &str = "✗"; // X mark
 pub const ICON_HEART: &str = "♥";
 pub const ICON_EMPTY_HEART: &str = "♡";
-pub const ICON_UP: &str = "▲";           // Filled triangle - more visible than ↑
-pub const ICON_DOWN: &str = "▼";         // Filled triangle - more visible than ↓
-pub const ICON_STABLE: &str = "◆";       // Diamond for stable (distinct shape)
+pub const ICON_UP: &str = "▲"; // Filled triangle - more visible than ↑
+pub const ICON_DOWN: &str = "▼"; // Filled triangle - more visible than ↓
+pub const ICON_STABLE: &str = "◆"; // Diamond for stable (distinct shape)
 pub const ICON_ACTIVE: &str = "●";
 pub const ICON_INACTIVE: &str = "○";
-pub const ICON_MEETING: &str = "☰";      // Menu/list icon (more compatible than 📅)
-pub const ICON_PERSON: &str = "◉";       // Circle with dot (more compatible than 👤)
+pub const ICON_MEETING: &str = "☰"; // Menu/list icon (more compatible than 📅)
+pub const ICON_PERSON: &str = "◉"; // Circle with dot (more compatible than 👤)
 
 /// Get status icon based on overdue state
 /// Icon shape differs - not just color
 pub fn overdue_icon(is_overdue: bool) -> &'static str {
     if is_overdue {
-        ICON_WARNING  // ⚠ triangle shape
+        ICON_WARNING // ⚠ triangle shape
     } else {
-        ICON_OK       // ✓ checkmark shape
+        ICON_OK // ✓ checkmark shape
     }
 }
 
@@ -191,16 +191,16 @@ pub fn overdue_icon(is_overdue: bool) -> &'static str {
 /// Uses blue/yellow distinction (colorblind-safe)
 pub fn overdue_color(is_overdue: bool) -> Color {
     if is_overdue {
-        COLOR_WARNING  // Yellow
+        COLOR_WARNING // Yellow
     } else {
-        COLOR_SUCCESS  // Cyan
+        COLOR_SUCCESS // Cyan
     }
 }
 
 /// Get active status icon
 pub fn active_icon(is_active: bool) -> &'static str {
     if is_active {
-        ICON_ACTIVE   // ● filled
+        ICON_ACTIVE // ● filled
     } else {
         ICON_INACTIVE // ○ empty
     }
@@ -209,9 +209,9 @@ pub fn active_icon(is_active: bool) -> &'static str {
 /// Mood trend with distinct shapes (not just arrows)
 pub fn mood_trend_icon(trend: Option<crate::model::MoodTrend>) -> &'static str {
     match trend {
-        Some(crate::model::MoodTrend::Rising) => ICON_UP,      // ▲
-        Some(crate::model::MoodTrend::Falling) => ICON_DOWN,   // ▼
-        Some(crate::model::MoodTrend::Stable) => ICON_STABLE,  // ◆
+        Some(crate::model::MoodTrend::Rising) => ICON_UP, // ▲
+        Some(crate::model::MoodTrend::Falling) => ICON_DOWN, // ▼
+        Some(crate::model::MoodTrend::Stable) => ICON_STABLE, // ◆
         None => " ",
     }
 }

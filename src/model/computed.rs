@@ -37,7 +37,11 @@ impl MoodTrend {
     }
 }
 
-pub fn compute_engineer_summary(engineer: &Engineer, meetings: &[Meeting], overdue_threshold: u32) -> EngineerSummary {
+pub fn compute_engineer_summary(
+    engineer: &Engineer,
+    meetings: &[Meeting],
+    overdue_threshold: u32,
+) -> EngineerSummary {
     let today = Local::now().date_naive();
 
     // Find last meeting date
@@ -63,10 +67,7 @@ pub fn compute_engineer_summary(engineer: &Engineer, meetings: &[Meeting], overd
     let recent_mood = recent_moods.first().copied();
     let mood_trend = calculate_mood_trend(&recent_moods);
 
-    let color = engineer_color(
-        engineer.profile.color.as_deref(),
-        &engineer.profile.name,
-    );
+    let color = engineer_color(engineer.profile.color.as_deref(), &engineer.profile.name);
 
     let urgency_score = calculate_urgency_score(
         days_since_meeting,
@@ -78,7 +79,11 @@ pub fn compute_engineer_summary(engineer: &Engineer, meetings: &[Meeting], overd
 
     EngineerSummary {
         name: engineer.profile.name.clone(),
-        level: engineer.profile.level.clone().unwrap_or_else(|| "-".to_string()),
+        level: engineer
+            .profile
+            .level
+            .clone()
+            .unwrap_or_else(|| "-".to_string()),
         meeting_frequency: engineer.profile.meeting_frequency.clone(),
         active: engineer.profile.active,
         days_since_meeting,

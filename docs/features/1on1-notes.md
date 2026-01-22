@@ -285,34 +285,35 @@ All 1-on-1 notes are stored locally on the user's machine.
 
 ## UI Components
 
-### Note Editor Component
+### Note Viewer Component
 
-The primary interface for writing and editing notes.
+The primary interface for viewing notes. Editing is delegated to the user's external editor.
 
 **Elements:**
-- Markdown editor with syntax highlighting
-- Optional preview pane (toggle)
-- Toolbar with common formatting shortcuts (optional)
-- Save status indicator
+- Markdown content display with syntax highlighting
 - Meeting context header:
-  - Engineer name (clickable to profile)
   - Meeting date
-  - Meeting status badge
+  - Mood gauge (F1-F5 to set)
+- Help line showing available actions
 
 **Behavior:**
-- Full-screen or embedded mode
-- Keyboard shortcuts for common actions
-- Tab key inserts spaces (configurable)
-- Escape key to exit without save modal
+- View-only display of markdown content
+- Press 'e' to open in external editor ($EDITOR)
+- Escape key to return to engineer detail view
 
 **Keyboard Shortcuts:**
 | Shortcut | Action |
 |----------|--------|
-| `Cmd/Ctrl + B` | Bold |
-| `Cmd/Ctrl + I` | Italic |
-| `Cmd/Ctrl + K` | Insert link |
-| `Cmd/Ctrl + Enter` | Toggle task completion |
-| `Cmd/Ctrl + S` | Force save (comfort feature) |
+| `e` | Open in external editor |
+| `F1-F5` | Set mood (1-5) |
+| `Esc` | Back to engineer view |
+| `q` | Quit application |
+
+**External Editor Delegation:**
+- Follows UNIX philosophy: delegate editing to purpose-built tools
+- Similar to how `git commit` spawns $EDITOR for commit message editing
+- Respects `$EDITOR` → `$VISUAL` → fallback chain (nano, vim, vi)
+- Supports GUI editors that support `--wait` flag (e.g., `code --wait`)
 
 ### Notes History View
 
@@ -447,12 +448,28 @@ Notes are stored as plain markdown text in IndexedDB. This approach means:
 
 ## Implementation Notes
 
-### Editor Library Considerations
+### External Editor Delegation
 
-Potential markdown editor libraries:
-- CodeMirror 6 (recommended - performant, extensible)
-- Monaco Editor (powerful but heavy)
-- Simple textarea with preview (MVP approach)
+The TUI delegates text editing to external editors following the UNIX philosophy:
+
+**Design Rationale:**
+- Do one thing well: TUI focuses on organization and tracking, not text editing
+- Users already have preferred markdown editors (vim, emacs, VS Code, etc.)
+- Simplicity over features: don't reinvent editors
+- Terminal-first users are comfortable with `$EDITOR` workflows
+
+**Editor Resolution Chain:**
+1. `$EDITOR` environment variable (standard for line-based editors)
+2. `$VISUAL` environment variable (standard for full-screen editors)
+3. Fallback: nano → vim → vi
+
+**Workflow:**
+1. User presses 'e' in note viewer
+2. TUI suspends (leaves alternate screen, disables raw mode)
+3. External editor spawns with meeting file path
+4. User edits and saves in their preferred editor
+5. TUI resumes and reloads content from disk
+6. Status message shows whether changes were detected
 
 ### Search Implementation
 

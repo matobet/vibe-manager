@@ -65,7 +65,12 @@ pub struct Engineer {
 }
 
 impl Engineer {
-    pub fn new(slug: String, path: PathBuf, profile: EngineerProfile, notes_content: String) -> Self {
+    pub fn new(
+        slug: String,
+        path: PathBuf,
+        profile: EngineerProfile,
+        notes_content: String,
+    ) -> Self {
         Self {
             slug,
             path,
@@ -94,7 +99,7 @@ pub enum Level {
 }
 
 impl Level {
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_uppercase().as_str() {
             "P1" => Some(Level::P1),
             "P2" => Some(Level::P2),
@@ -124,7 +129,7 @@ pub enum MeetingFrequency {
 }
 
 impl MeetingFrequency {
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "weekly" => Some(MeetingFrequency::Weekly),
             "biweekly" => Some(MeetingFrequency::Biweekly),

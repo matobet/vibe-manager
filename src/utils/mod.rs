@@ -21,7 +21,9 @@ const ENGINEER_COLORS: &[Color] = &[
 /// Generate a display color from a name hash
 /// Returns a Color that can be used for borders and text highlighting
 pub fn color_from_name(name: &str) -> Color {
-    let hash: u32 = name.bytes().fold(0, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u32));
+    let hash: u32 = name
+        .bytes()
+        .fold(0, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u32));
     ENGINEER_COLORS[(hash as usize) % ENGINEER_COLORS.len()]
 }
 

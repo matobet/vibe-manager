@@ -3,8 +3,8 @@ use std::path::Path;
 
 use chrono::{Local, NaiveDate};
 
-use crate::model::{parse_meeting_date, Meeting, MeetingFrontmatter};
 use super::{parse_frontmatter, StorageError, StorageResult};
+use crate::model::{parse_meeting_date, Meeting, MeetingFrontmatter};
 
 /// Load all meetings for an engineer
 pub fn load_meetings(engineer_dir: &Path) -> StorageResult<Vec<Meeting>> {
@@ -17,10 +17,7 @@ pub fn load_meetings(engineer_dir: &Path) -> StorageResult<Vec<Meeting>> {
             continue;
         }
 
-        let filename = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("");
+        let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
         // Skip non-meeting files
         if filename.starts_with('_') || !filename.ends_with(".md") {
@@ -69,9 +66,10 @@ pub fn create_meeting(engineer_dir: &Path, date: Option<NaiveDate>) -> StorageRe
     let path = engineer_dir.join(&filename);
 
     if path.exists() {
-        return Err(StorageError::InvalidWorkspace(
-            format!("Meeting already exists for {}", date)
-        ));
+        return Err(StorageError::InvalidWorkspace(format!(
+            "Meeting already exists for {}",
+            date
+        )));
     }
 
     let content = format!(
@@ -82,12 +80,7 @@ pub fn create_meeting(engineer_dir: &Path, date: Option<NaiveDate>) -> StorageRe
         date.format("%B %d, %Y")
     );
 
-    let meeting = Meeting::new(
-        date,
-        path,
-        MeetingFrontmatter::default(),
-        content,
-    );
+    let meeting = Meeting::new(date, path, MeetingFrontmatter::default(), content);
 
     save_meeting(&meeting)?;
     Ok(meeting)
@@ -95,9 +88,9 @@ pub fn create_meeting(engineer_dir: &Path, date: Option<NaiveDate>) -> StorageRe
 
 /// Update meeting mood
 pub fn update_meeting_mood(meeting: &mut Meeting, mood: u8) -> StorageResult<()> {
-    if mood < 1 || mood > 5 {
+    if !(1..=5).contains(&mood) {
         return Err(StorageError::InvalidWorkspace(
-            "Mood must be between 1 and 5".to_string()
+            "Mood must be between 1 and 5".to_string(),
         ));
     }
     meeting.frontmatter.mood = Some(mood);

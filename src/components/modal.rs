@@ -8,9 +8,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::theme::{
-    focused_block, style_header, style_muted, COLOR_PRIMARY, COLOR_SECONDARY,
-};
+use crate::theme::{focused_block, style_header, style_muted, COLOR_PRIMARY, COLOR_SECONDARY};
 
 /// Render a centered modal dialog
 pub fn render_modal(frame: &mut Frame, area: Rect, width: u16, height: u16) -> Rect {
@@ -46,7 +44,10 @@ pub struct NewEngineerModal<'a> {
 
 impl<'a> NewEngineerModal<'a> {
     pub fn new(fields: &'a [String], current_field: usize) -> Self {
-        Self { fields, current_field }
+        Self {
+            fields,
+            current_field,
+        }
     }
 
     pub fn render(&self, frame: &mut Frame, area: Rect) {
@@ -123,28 +124,37 @@ impl HelpModal {
         frame.render_widget(block, modal_area);
 
         let sections = vec![
-            ("Party View", vec![
-                ("h/l or ←/→", "Select party member"),
-                ("j/k or ↑/↓", "Navigate grid"),
-                ("Enter/Space", "View member details"),
-                ("n", "Recruit new member"),
-                ("g/G", "Jump to first/last"),
-                ("r", "Refresh data"),
-                ("q", "Quit"),
-            ]),
-            ("Member Details", vec![
-                ("n", "New 1-on-1 meeting"),
-                ("Enter", "View meeting notes"),
-                ("Esc", "Back to party view"),
-            ]),
-            ("Meeting Notes", vec![
-                ("←↑↓→", "Move cursor"),
-                ("Home/End", "Start/end of line"),
-                ("Del", "Delete character"),
-                ("Ctrl+S", "Save note"),
-                ("F1-F5", "Set mood (1-5)"),
-                ("Esc", "Back"),
-            ]),
+            (
+                "Party View",
+                vec![
+                    ("h/l or ←/→", "Select party member"),
+                    ("j/k or ↑/↓", "Navigate grid"),
+                    ("Enter/Space", "View member details"),
+                    ("n", "Recruit new member"),
+                    ("g/G", "Jump to first/last"),
+                    ("r", "Refresh data"),
+                    ("q", "Quit"),
+                ],
+            ),
+            (
+                "Member Details",
+                vec![
+                    ("n", "New 1-on-1 meeting"),
+                    ("Enter", "View meeting notes"),
+                    ("Esc", "Back to party view"),
+                ],
+            ),
+            (
+                "Meeting Notes",
+                vec![
+                    ("←↑↓→", "Move cursor"),
+                    ("Home/End", "Start/end of line"),
+                    ("Del", "Delete character"),
+                    ("Ctrl+S", "Save note"),
+                    ("F1-F5", "Set mood (1-5)"),
+                    ("Esc", "Back"),
+                ],
+            ),
         ];
 
         let mut lines = Vec::new();
@@ -152,17 +162,22 @@ impl HelpModal {
             lines.push(Line::from(Span::styled(section, style_header())));
             for (key, desc) in bindings {
                 lines.push(Line::from(vec![
-                    Span::styled(format!("  {:12}", key), Style::default().fg(COLOR_SECONDARY)),
+                    Span::styled(
+                        format!("  {:12}", key),
+                        Style::default().fg(COLOR_SECONDARY),
+                    ),
                     Span::raw(desc),
                 ]));
             }
             lines.push(Line::from(""));
         }
 
-        lines.push(Line::from(Span::styled("Press ? or Esc to close", style_muted())));
+        lines.push(Line::from(Span::styled(
+            "Press ? or Esc to close",
+            style_muted(),
+        )));
 
         let para = Paragraph::new(lines);
         frame.render_widget(para, inner);
     }
 }
-

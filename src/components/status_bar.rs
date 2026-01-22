@@ -29,17 +29,14 @@ impl<'a> StatusBar<'a> {
     pub fn render(&self, frame: &mut Frame, area: Rect) {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Min(20),
-                Constraint::Length(30),
-            ])
+            .constraints([Constraint::Min(20), Constraint::Length(45)])
             .split(area);
 
         // Left side: mode and context
         let mode_str = match self.view_mode {
             ViewMode::Dashboard => "DASHBOARD",
             ViewMode::EngineerDetail => "ENGINEER",
-            ViewMode::NoteEditor => "EDITOR",
+            ViewMode::NoteViewer | ViewMode::DeleteConfirmModal => "NOTE",
             ViewMode::NewEngineerModal => "NEW ENGINEER",
             ViewMode::Help => "HELP",
         };
@@ -48,7 +45,9 @@ impl<'a> StatusBar<'a> {
             Line::from(vec![
                 Span::styled(
                     format!(" {} ", mode_str),
-                    Style::default().fg(COLOR_PRIMARY).bg(ratatui::style::Color::DarkGray),
+                    Style::default()
+                        .fg(COLOR_PRIMARY)
+                        .bg(ratatui::style::Color::DarkGray),
                 ),
                 Span::raw(" "),
                 Span::styled(msg, Style::default().fg(COLOR_SECONDARY)),
@@ -57,7 +56,9 @@ impl<'a> StatusBar<'a> {
             Line::from(vec![
                 Span::styled(
                     format!(" {} ", mode_str),
-                    Style::default().fg(COLOR_PRIMARY).bg(ratatui::style::Color::DarkGray),
+                    Style::default()
+                        .fg(COLOR_PRIMARY)
+                        .bg(ratatui::style::Color::DarkGray),
                 ),
                 Span::raw(" "),
                 Span::raw(self.context),
@@ -70,8 +71,10 @@ impl<'a> StatusBar<'a> {
         // Right side: keybindings hint
         let hints = match self.view_mode {
             ViewMode::Dashboard => "h/l:nav  Enter:view  n:new  ?:help  q:quit",
-            ViewMode::EngineerDetail => "n:new meeting  Enter:view  Esc:back  ?:help",
-            ViewMode::NoteEditor => "Ctrl+S:save  F1-F5:mood  Esc:back",
+            ViewMode::EngineerDetail => "e:edit  n:new  Del:delete  Enter:view  Bksp:back",
+            ViewMode::NoteViewer | ViewMode::DeleteConfirmModal => {
+                "e:edit  Del:delete  F1-F5:mood  Bksp:back"
+            }
             ViewMode::Help => "?/Esc:close",
             _ => "Esc:cancel  Enter:confirm",
         };

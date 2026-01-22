@@ -17,7 +17,12 @@ pub struct Meeting {
 }
 
 impl Meeting {
-    pub fn new(date: NaiveDate, path: PathBuf, frontmatter: MeetingFrontmatter, content: String) -> Self {
+    pub fn new(
+        date: NaiveDate,
+        path: PathBuf,
+        frontmatter: MeetingFrontmatter,
+        content: String,
+    ) -> Self {
         Self {
             date,
             path,
@@ -27,7 +32,7 @@ impl Meeting {
     }
 
     pub fn mood(&self) -> Option<u8> {
-        self.frontmatter.mood.filter(|&m| m >= 1 && m <= 5)
+        self.frontmatter.mood.filter(|&m| (1..=5).contains(&m))
     }
 }
 

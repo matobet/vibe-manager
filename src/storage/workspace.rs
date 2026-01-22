@@ -1,8 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::model::{Workspace, WorkspaceConfig};
 use super::{StorageError, StorageResult};
+use crate::model::{Workspace, WorkspaceConfig};
 
 const WORKSPACE_FILE: &str = ".vibe-manager";
 
@@ -31,9 +31,10 @@ pub fn load_workspace(path: &Path) -> StorageResult<Workspace> {
     let config_path = path.join(WORKSPACE_FILE);
 
     if !config_path.exists() {
-        return Err(StorageError::InvalidWorkspace(
-            format!("No {} file found in {:?}", WORKSPACE_FILE, path)
-        ));
+        return Err(StorageError::InvalidWorkspace(format!(
+            "No {} file found in {:?}",
+            WORKSPACE_FILE, path
+        )));
     }
 
     let content = fs::read_to_string(&config_path)?;
@@ -52,7 +53,7 @@ pub fn init_workspace(path: &Path) -> StorageResult<Workspace> {
 
     if config_path.exists() {
         return Err(StorageError::InvalidWorkspace(
-            "Workspace already exists".to_string()
+            "Workspace already exists".to_string(),
         ));
     }
 

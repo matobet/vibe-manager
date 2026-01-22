@@ -10,9 +10,9 @@ use ratatui::{
 
 use crate::model::{EngineerSummary, WorkspaceSummary};
 use crate::theme::{
-    mood_gauge, rpg_block, simple_block, style_header, style_muted,
-    style_success, style_title, style_warning, COLOR_PRIMARY, COLOR_SECONDARY,
-    COLOR_SUCCESS, ICON_HEART, ICON_PERSON, ICON_WARNING,
+    mood_gauge, rpg_block, simple_block, style_header, style_muted, style_success, style_title,
+    style_warning, COLOR_PRIMARY, COLOR_SECONDARY, COLOR_SUCCESS, ICON_HEART, ICON_PERSON,
+    ICON_WARNING,
 };
 
 use super::AvatarGrid;
@@ -41,9 +41,9 @@ impl<'a> Dashboard<'a> {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3),  // Title
-                Constraint::Length(4),  // Stats
-                Constraint::Min(12),    // Avatar grid
+                Constraint::Length(3), // Title
+                Constraint::Length(4), // Stats
+                Constraint::Min(12),   // Avatar grid
             ])
             .split(area);
 
@@ -60,13 +60,11 @@ impl<'a> Dashboard<'a> {
             .title("═══════════════════════════════════════")
             .title_alignment(Alignment::Center);
 
-        let title_text = vec![
-            Line::from(vec![
-                Span::styled("⚔ ", Style::default().fg(COLOR_SECONDARY)),
-                Span::styled("VIBE MANAGER", style_title()),
-                Span::styled(" ⚔", Style::default().fg(COLOR_SECONDARY)),
-            ]),
-        ];
+        let title_text = vec![Line::from(vec![
+            Span::styled("⚔ ", Style::default().fg(COLOR_SECONDARY)),
+            Span::styled("VIBE MANAGER", style_title()),
+            Span::styled(" ⚔", Style::default().fg(COLOR_SECONDARY)),
+        ])];
 
         let inner = title_block.inner(area);
         frame.render_widget(title_block, area);
@@ -87,7 +85,10 @@ impl<'a> Dashboard<'a> {
         // Team size
         let team_text = vec![
             Line::from(vec![
-                Span::styled(format!("{} ", ICON_PERSON), Style::default().fg(COLOR_PRIMARY)),
+                Span::styled(
+                    format!("{} ", ICON_PERSON),
+                    Style::default().fg(COLOR_PRIMARY),
+                ),
                 Span::styled(
                     format!("{}", self.workspace_summary.active_count),
                     style_header(),
@@ -111,7 +112,14 @@ impl<'a> Dashboard<'a> {
         let overdue_text = vec![
             Line::from(vec![
                 Span::styled(
-                    format!("{} ", if self.workspace_summary.overdue_count > 0 { ICON_WARNING } else { "★" }),
+                    format!(
+                        "{} ",
+                        if self.workspace_summary.overdue_count > 0 {
+                            ICON_WARNING
+                        } else {
+                            "★"
+                        }
+                    ),
                     overdue_style,
                 ),
                 Span::styled(
@@ -130,7 +138,10 @@ impl<'a> Dashboard<'a> {
                 let rounded = mood.round() as u8;
                 vec![
                     Line::from(vec![
-                        Span::styled(format!("{} ", ICON_HEART), Style::default().fg(COLOR_SUCCESS)),
+                        Span::styled(
+                            format!("{} ", ICON_HEART),
+                            Style::default().fg(COLOR_SUCCESS),
+                        ),
                         Span::raw(mood_gauge(rounded)),
                     ]),
                     Line::from(Span::styled(format!("{:.1} morale", mood), style_muted())),
@@ -163,10 +174,7 @@ impl<'a> Dashboard<'a> {
 pub fn render_empty_state(frame: &mut Frame, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),
-            Constraint::Min(10),
-        ])
+        .constraints([Constraint::Length(3), Constraint::Min(10)])
         .split(area);
 
     // Title
@@ -175,13 +183,11 @@ pub fn render_empty_state(frame: &mut Frame, area: Rect) {
         .border_type(BorderType::Double)
         .border_style(Style::default().fg(COLOR_PRIMARY));
 
-    let title_text = vec![
-        Line::from(vec![
-            Span::styled("⚔ ", Style::default().fg(COLOR_SECONDARY)),
-            Span::styled("VIBE MANAGER", style_title()),
-            Span::styled(" ⚔", Style::default().fg(COLOR_SECONDARY)),
-        ]),
-    ];
+    let title_text = vec![Line::from(vec![
+        Span::styled("⚔ ", Style::default().fg(COLOR_SECONDARY)),
+        Span::styled("VIBE MANAGER", style_title()),
+        Span::styled(" ⚔", Style::default().fg(COLOR_SECONDARY)),
+    ])];
 
     let inner = title_block.inner(chunks[0]);
     frame.render_widget(title_block, chunks[0]);
@@ -203,8 +209,14 @@ pub fn render_empty_state(frame: &mut Frame, area: Rect) {
         Line::from("Press 'n' to recruit your first party member"),
         Line::from(""),
         Line::from(Span::styled("Tips:", style_muted())),
-        Line::from(Span::styled("  • Each member gets their own quest log", style_muted())),
-        Line::from(Span::styled("  • Track morale with 1-on-1 meetings", style_muted())),
+        Line::from(Span::styled(
+            "  • Each member gets their own quest log",
+            style_muted(),
+        )),
+        Line::from(Span::styled(
+            "  • Track morale with 1-on-1 meetings",
+            style_muted(),
+        )),
         Line::from(Span::styled("  • Press '?' for help", style_muted())),
     ];
 

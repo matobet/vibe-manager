@@ -1,17 +1,18 @@
 //! Engineer detail view component
 
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-    style::Style,
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Cell, Paragraph, Row, Table, TableState},
+    widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table, TableState},
     Frame,
 };
 
 use crate::model::{Engineer, EngineerSummary, Meeting};
 use crate::theme::{
-    format_days_since, format_meeting_frequency, mood_color, mood_gauge, rpg_block, simple_block,
-    style_header, style_muted, style_success, style_title,
+    format_days_ago, format_meeting_frequency, mood_color, mood_gauge, mood_gauge_with_value,
+    mood_trend_icon, overdue_color, rpg_block, simple_block, sprites, style_header, style_muted,
+    style_title, COLOR_MUTED,
 };
 
 pub struct EngineerDetail<'a> {
@@ -40,7 +41,7 @@ impl<'a> EngineerDetail<'a> {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(11), // Profile info (including family on separate lines)
+                Constraint::Length(12), // Profile info with 2-column layout
                 Constraint::Min(10),    // Meeting history
             ])
             .split(area);
@@ -50,64 +51,169 @@ impl<'a> EngineerDetail<'a> {
     }
 
     fn render_profile(&self, frame: &mut Frame, area: Rect) {
+        let block = rpg_block("Engineer Profile");
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        // 2-column layout: avatar+identity on left, stats+bio on right
+        let columns = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(50), // Left column: avatar + identity
+                Constraint::Percentage(50), // Right column: stats + bio
+            ])
+            .split(inner);
+
+        self.render_avatar_and_identity(frame, columns[0]);
+        self.render_stats_and_bio(frame, columns[1]);
+    }
+
+    fn render_avatar_and_identity(&self, frame: &mut Frame, area: Rect) {
         let profile = &self.engineer.profile;
 
-        // Header with level badge: ★ P3  Engineer Name
-        let level_badge = format!("★ {}", profile.level.as_deref().unwrap_or("-"));
-        let mut lines = vec![Line::from(vec![
-            Span::styled(level_badge, Style::default().fg(self.summary.color)),
-            Span::raw("   "),
-            Span::styled(&profile.name, style_title()),
-        ])];
+        // Stack avatar and identity vertically
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1), // Top padding
+                Constraint::Length(3), // Avatar (3 lines)
+                Constraint::Length(1), // Spacing
+                Constraint::Length(1), // Name
+                Constraint::Length(1), // Title + level
+                Constraint::Min(0),    // Remaining space
+            ])
+            .split(area);
 
-        if let Some(title) = &profile.title {
-            lines.push(Line::from(Span::styled(title, style_muted())));
-        }
+        // Avatar
+        let sprite = sprites::FaceSprite::from_summary(
+            self.summary,
+            Style::default().fg(self.summary.color),
+        );
+        let avatar_para = Paragraph::new(sprite.lines()).alignment(Alignment::Center);
+        frame.render_widget(avatar_para, chunks[1]);
 
-        lines.push(Line::from(""));
+        // Name
+        let name_line = Line::from(Span::styled(
+            profile.name.clone(),
+            style_title().add_modifier(Modifier::BOLD),
+        ));
+        let name_para = Paragraph::new(name_line).alignment(Alignment::Center);
+        frame.render_widget(name_para, chunks[3]);
 
-        // 1-on-1 frequency and status
-        lines.push(Line::from(vec![
-            Span::raw("Meeting Frequency: "),
-            Span::styled(
-                format_meeting_frequency(&profile.meeting_frequency),
-                style_success(),
-            ),
-            Span::raw("  │  "),
-            Span::raw("Last 1-on-1: "),
-            Span::raw(format_days_since(
-                self.summary.days_since_meeting,
-                self.engineer.meeting_frequency_days(),
-            )),
+        // Title + level
+        let title_text = profile.title.as_deref().unwrap_or("Engineer");
+        let level_text = profile.level.as_deref().unwrap_or("-");
+        let title_level_line = Line::from(vec![
+            Span::styled(title_text, style_muted()),
+            Span::styled("  ★ ", Style::default().fg(self.summary.color)),
+            Span::styled(level_text, Style::default().fg(self.summary.color)),
+        ]);
+        let title_para = Paragraph::new(title_level_line).alignment(Alignment::Center);
+        frame.render_widget(title_para, chunks[4]);
+    }
+
+    fn render_stats_and_bio(&self, frame: &mut Frame, area: Rect) {
+        let profile = &self.engineer.profile;
+        let has_bio = profile.partner.is_some() || !profile.children.is_empty();
+
+        // Stack stats and bio vertically
+        let panels = if has_bio {
+            Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(5), Constraint::Min(3)])
+                .split(area)
+        } else {
+            Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(4)])
+                .split(area)
+        };
+
+        // Render stats panel as a table
+        let stats_block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(COLOR_MUTED))
+            .title(" ⚔ STATS ")
+            .title_style(style_header());
+
+        let stats_inner = stats_block.inner(panels[0]);
+        frame.render_widget(stats_block, panels[0]);
+
+        // Build stats rows
+        let mut stats_rows = vec![];
+
+        // Frequency row
+        let freq_text = format_meeting_frequency(&profile.meeting_frequency);
+        stats_rows.push(Row::new(vec![
+            Cell::from("Frequency"),
+            Cell::from(freq_text).style(style_title()),
         ]));
 
-        // Mood
+        // Last 1-on-1 row
+        let last_meeting = format_days_ago(self.summary.days_since_meeting);
+        let last_meeting_style = if self.summary.is_overdue {
+            Style::default().fg(overdue_color(true))
+        } else {
+            Style::default()
+        };
+        let last_meeting_prefix = if self.summary.is_overdue { "⚠ " } else { "" };
+        stats_rows.push(Row::new(vec![
+            Cell::from("Last 1-on-1"),
+            Cell::from(format!("{}{}", last_meeting_prefix, last_meeting)).style(last_meeting_style),
+        ]));
+
+        // Morale row
         if let Some(mood) = self.summary.recent_mood {
-            lines.push(Line::from(vec![
-                Span::raw("Mood: "),
-                Span::styled(mood_gauge(mood), Style::default().fg(mood_color(mood))),
+            let mood_display = mood_gauge_with_value(mood);
+            let trend_icon = mood_trend_icon(self.summary.mood_trend);
+            stats_rows.push(Row::new(vec![
+                Cell::from("Morale"),
+                Cell::from(Line::from(vec![
+                    Span::styled(mood_display, Style::default().fg(mood_color(mood))),
+                    Span::raw(" "),
+                    Span::styled(trend_icon, Style::default().fg(mood_color(mood))),
+                ])),
             ]));
         }
 
-        // Personal info
-        if profile.partner.is_some() || !profile.children.is_empty() {
-            lines.push(Line::from(""));
-            if let Some(partner) = &profile.partner {
-                lines.push(Line::from(Span::styled(
-                    format!("Partner: {}", partner),
-                    style_muted(),
-                )));
-            }
-            if !profile.children.is_empty() {
-                lines.push(Line::from(Span::styled(
-                    format!("Kids: {}", profile.children.join(", ")),
-                    style_muted(),
-                )));
-            }
-        }
+        let stats_table = Table::new(
+            stats_rows,
+            [Constraint::Length(12), Constraint::Min(10)],
+        );
+        frame.render_widget(stats_table, stats_inner);
 
-        let para = Paragraph::new(lines).block(rpg_block("Profile"));
-        frame.render_widget(para, area);
+        // Render bio panel if there's personal info
+        if has_bio {
+            let bio_block = Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(COLOR_MUTED))
+                .title(" ♥ BIO ")
+                .title_style(style_header());
+
+            let bio_inner = bio_block.inner(panels[1]);
+            frame.render_widget(bio_block, panels[1]);
+
+            let mut bio_lines = vec![];
+
+            if let Some(partner) = &profile.partner {
+                bio_lines.push(Line::from(vec![
+                    Span::raw("Partner: "),
+                    Span::styled(partner, style_muted()),
+                ]));
+            }
+
+            if !profile.children.is_empty() {
+                bio_lines.push(Line::from(vec![
+                    Span::raw("Kids: "),
+                    Span::styled(profile.children.join(", "), style_muted()),
+                ]));
+            }
+
+            let bio_para = Paragraph::new(bio_lines);
+            frame.render_widget(bio_para, bio_inner);
+        }
     }
 
     fn render_meetings(&self, frame: &mut Frame, area: Rect) {

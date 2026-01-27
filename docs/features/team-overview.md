@@ -247,9 +247,40 @@ Engineers appear left-to-right, top-to-bottom by descending urgency score. The f
 
 ### 5.1 Engineer Card/Row
 
-The primary display unit for each team member, styled as an RPG character card with a distinctive color border (derived from the engineer's name).
+The primary display unit for each team member, styled as an RPG character card with a distinctive color border (derived from the engineer's name) and a kaomoji avatar.
 
-**Card Layout - RPG Character Card Style:**
+**TUI Implementation - Kaomoji Avatar Cards:**
+```
+ ╭─ ★ P3 ★ ─╮        ╔═ ★ P4 ★ ═╗
+ │  ╔═════╗  │        ║  ╔═ ☆ ═╗  ║
+ │  ║ ◕‿◕ ║  │        ║  ║ ^‿^ ║  ║
+ │  ╚═════╝  │        ║  ╚═════╝  ║
+ │ Alex Chen │        ║Jordan Lee ║
+ │  ♥♥♥♡♡    │        ║ ▲ ♥♥♥♥♡  ║
+ │ ✓ 3d ago  │        ║ ✓ today   ║
+ ╰───────────╯        ╚═══════════╝
+```
+
+**Avatar Frame Styles by Level:**
+- P1-P2: Rounded/simple corners (`╭─────╮` / `┌─────┐`)
+- P3: Double-line box (`╔═════╗`)
+- P4: Double-line with hollow star (`╔═ ☆ ═╗`)
+- P5: Double-line with filled star (`╔═ ★ ═╗`)
+
+**Kaomoji Expressions by Mood:**
+- Mood 5: `^‿^` (blissful)
+- Mood 4: `◕‿◕` (happy)
+- Mood 3: `•_•` (neutral)
+- Mood 2: `◦︵◦` (worried)
+- Mood 1: `x_x` (stressed)
+- Overdue: `-_-` with floating z's
+
+**Mood Trend Indicators:**
+- `▲` Green = improving
+- `◆` Gray = stable
+- `▼` Red = declining
+
+**Card Layout - RPG Character Card Style (Alternative):**
 ```
  ╔═══════════════════════════════════════════════════════════════════╗
  ║  ┌───────────────────────────────────────────────────────────┐   ║
@@ -296,10 +327,10 @@ The primary display unit for each team member, styled as an RPG character card w
 
 **Mood Status Badge:**
 ```
- Score: 3 ↓           ← Number with trend arrow
-        ↓ Red = declining
-        → Gray = stable
-        ↑ Green = improving
+ ▲ ♥♥♥♥♡             ← Trend arrow (colored) + heart gauge
+   ▲ Green = improving
+   ◆ Gray = stable
+   ▼ Red = declining
 ```
 
 ### 5.3 Quick Action Buttons

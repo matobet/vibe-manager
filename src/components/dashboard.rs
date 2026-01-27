@@ -194,15 +194,12 @@ pub fn render_empty_state(frame: &mut Frame, area: Rect) {
     let para = Paragraph::new(title_text).alignment(Alignment::Center);
     frame.render_widget(para, inner);
 
-    // Empty party message
+    // Empty party message with kaomoji style
     let empty_art = vec![
         Line::from(""),
-        Line::from(Span::styled("       ╭───╮       ", style_muted())),
-        Line::from(Span::styled("       │? ?│       ", style_muted())),
-        Line::from(Span::styled("       │ ─ │       ", style_muted())),
-        Line::from(Span::styled("       ╰───╯       ", style_muted())),
-        Line::from(Span::styled("        /█\\        ", style_muted())),
-        Line::from(Span::styled("        / \\        ", style_muted())),
+        Line::from(Span::styled("       ╭─────╮       ", style_muted())),
+        Line::from(Span::styled("       │ ?_? │       ", style_muted())),
+        Line::from(Span::styled("       ╰─────╯       ", style_muted())),
         Line::from(""),
         Line::from(Span::styled("Your party is empty!", style_header())),
         Line::from(""),

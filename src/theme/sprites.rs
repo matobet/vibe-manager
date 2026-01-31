@@ -13,7 +13,7 @@ use ratatui::{
 use crate::model::EngineerSummary;
 
 /// Frame top based on level
-pub fn frame_top(level: Option<&str>) -> &'static str {
+fn frame_top(level: Option<&str>) -> &'static str {
     match level {
         Some("P1") => "╭─────╮",
         Some("P2") => "┌─────┐",
@@ -25,7 +25,7 @@ pub fn frame_top(level: Option<&str>) -> &'static str {
 }
 
 /// Frame middle borders (left, right) based on level
-pub fn frame_mid(level: Option<&str>) -> (&'static str, &'static str) {
+fn frame_mid(level: Option<&str>) -> (&'static str, &'static str) {
     match level {
         Some("P1") | Some("P2") => ("│", "│"),
         _ => ("║", "║"),
@@ -33,7 +33,7 @@ pub fn frame_mid(level: Option<&str>) -> (&'static str, &'static str) {
 }
 
 /// Frame bottom based on level
-pub fn frame_bottom(level: Option<&str>) -> &'static str {
+fn frame_bottom(level: Option<&str>) -> &'static str {
     match level {
         Some("P1") => "╰─────╯",
         Some("P2") => "└─────┘",
@@ -49,7 +49,7 @@ pub fn frame_bottom(level: Option<&str>) -> &'static str {
 /// - Mood 3 (neutral):   •_•   dot eyes + line - neutral
 /// - Mood 2 (worried):   ◦︵◦   circle eyes + frown - sad
 /// - Mood 1 (stressed):  x_x   x eyes + line - distressed
-pub fn face(mood: Option<u8>, is_overdue: bool) -> &'static str {
+fn face(mood: Option<u8>, is_overdue: bool) -> &'static str {
     if is_overdue {
         return "-_-"; // sleepy/tired
     }
@@ -60,17 +60,6 @@ pub fn face(mood: Option<u8>, is_overdue: bool) -> &'static str {
         Some(2) => "◦︵◦", // circle eyes + frown - worried
         Some(1) => "x_x",  // x eyes - stressed
         _ => "•_•",        // default neutral
-    }
-}
-
-/// Overdue sleep indicators
-pub fn sleep_indicator(is_overdue: bool, days_overdue: Option<i64>) -> &'static str {
-    if !is_overdue {
-        return "";
-    }
-    match days_overdue {
-        Some(d) if d > 14 => "zZ",
-        _ => "z",
     }
 }
 

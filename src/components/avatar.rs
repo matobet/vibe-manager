@@ -14,7 +14,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::model::EngineerSummary;
+use crate::model::{EngineerSummary, MoodTrend};
 use crate::theme::{
     format_days_ago, mood_color, mood_gauge, mood_trend_icon, overdue_color, overdue_icon, sprites,
     style_muted, style_title, COLOR_SECONDARY,
@@ -98,8 +98,8 @@ impl<'a> AvatarCard<'a> {
             .recent_mood
             .map_or(style_muted(), |m| Style::default().fg(mood_color(m)));
         let trend_style = match self.summary.mood_trend {
-            Some(crate::model::MoodTrend::Rising) => Style::default().fg(Color::Green),
-            Some(crate::model::MoodTrend::Falling) => Style::default().fg(Color::Red),
+            Some(MoodTrend::Rising) => Style::default().fg(Color::Green),
+            Some(MoodTrend::Falling) => Style::default().fg(Color::Red),
             _ => style_muted(),
         };
         let mood_spans = if trend_icon.trim().is_empty() {

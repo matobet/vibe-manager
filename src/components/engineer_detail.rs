@@ -129,23 +129,31 @@ impl<'a> EngineerDetail<'a> {
                 .split(area)
         };
 
-        // Render stats panel as a table
-        let stats_block = Block::default()
+        self.render_stats_panel(frame, panels[0]);
+
+        if has_bio {
+            self.render_bio_panel(frame, panels[1]);
+        }
+    }
+
+    fn render_stats_panel(&self, frame: &mut Frame, area: Rect) {
+        let profile = &self.engineer.profile;
+
+        let block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(COLOR_MUTED))
             .title(" ⚔ STATS ")
             .title_style(style_header());
 
-        let stats_inner = stats_block.inner(panels[0]);
-        frame.render_widget(stats_block, panels[0]);
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
 
-        // Build stats rows
-        let mut stats_rows = vec![];
+        let mut rows = vec![];
 
         // Frequency row
         let freq_text = format_meeting_frequency(&profile.meeting_frequency);
-        stats_rows.push(Row::new(vec![
+        rows.push(Row::new(vec![
             Cell::from("Frequency"),
             Cell::from(freq_text).style(style_title()),
         ]));
@@ -158,16 +166,17 @@ impl<'a> EngineerDetail<'a> {
             Style::default()
         };
         let last_meeting_prefix = if self.summary.is_overdue { "⚠ " } else { "" };
-        stats_rows.push(Row::new(vec![
+        rows.push(Row::new(vec![
             Cell::from("Last 1-on-1"),
-            Cell::from(format!("{}{}", last_meeting_prefix, last_meeting)).style(last_meeting_style),
+            Cell::from(format!("{}{}", last_meeting_prefix, last_meeting))
+                .style(last_meeting_style),
         ]));
 
         // Morale row
         if let Some(mood) = self.summary.recent_mood {
             let mood_display = mood_gauge_with_value(mood);
             let trend_icon = mood_trend_icon(self.summary.mood_trend);
-            stats_rows.push(Row::new(vec![
+            rows.push(Row::new(vec![
                 Cell::from("Morale"),
                 Cell::from(Line::from(vec![
                     Span::styled(mood_display, Style::default().fg(mood_color(mood))),
@@ -177,43 +186,41 @@ impl<'a> EngineerDetail<'a> {
             ]));
         }
 
-        let stats_table = Table::new(
-            stats_rows,
-            [Constraint::Length(12), Constraint::Min(10)],
-        );
-        frame.render_widget(stats_table, stats_inner);
+        let table = Table::new(rows, [Constraint::Length(12), Constraint::Min(10)]);
+        frame.render_widget(table, inner);
+    }
 
-        // Render bio panel if there's personal info
-        if has_bio {
-            let bio_block = Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(COLOR_MUTED))
-                .title(" ♥ BIO ")
-                .title_style(style_header());
+    fn render_bio_panel(&self, frame: &mut Frame, area: Rect) {
+        let profile = &self.engineer.profile;
 
-            let bio_inner = bio_block.inner(panels[1]);
-            frame.render_widget(bio_block, panels[1]);
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(COLOR_MUTED))
+            .title(" ♥ BIO ")
+            .title_style(style_header());
 
-            let mut bio_lines = vec![];
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
 
-            if let Some(partner) = &profile.partner {
-                bio_lines.push(Line::from(vec![
-                    Span::raw("Partner: "),
-                    Span::styled(partner, style_muted()),
-                ]));
-            }
+        let mut lines = vec![];
 
-            if !profile.children.is_empty() {
-                bio_lines.push(Line::from(vec![
-                    Span::raw("Kids: "),
-                    Span::styled(profile.children.join(", "), style_muted()),
-                ]));
-            }
-
-            let bio_para = Paragraph::new(bio_lines);
-            frame.render_widget(bio_para, bio_inner);
+        if let Some(partner) = &profile.partner {
+            lines.push(Line::from(vec![
+                Span::raw("Partner: "),
+                Span::styled(partner, style_muted()),
+            ]));
         }
+
+        if !profile.children.is_empty() {
+            lines.push(Line::from(vec![
+                Span::raw("Kids: "),
+                Span::styled(profile.children.join(", "), style_muted()),
+            ]));
+        }
+
+        let para = Paragraph::new(lines);
+        frame.render_widget(para, inner);
     }
 
     fn render_meetings(&self, frame: &mut Frame, area: Rect) {

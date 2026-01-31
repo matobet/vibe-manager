@@ -1,10 +1,5 @@
 name: CI
 
-# TODO: Add code coverage tracking with cargo-llvm-cov
-#   - Install: cargo install cargo-llvm-cov
-#   - Generate LCOV: cargo llvm-cov --lcov --output-path lcov.info
-#   - Upload to Codecov or Coveralls for tracking coverage over time
-
 on:
   push:
     branches: [main]
@@ -60,3 +55,32 @@ jobs:
 
       - name: Check formatting
         run: cargo fmt --all -- --check
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Generate coverage report
+        run: |
+          cargo llvm-cov --all-features --html
+          cargo llvm-cov --all-features --no-run --summary-only
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: target/llvm-cov/html/
+          retention-days: 14

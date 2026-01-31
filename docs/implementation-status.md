@@ -13,7 +13,7 @@ Quick reference for what's implemented vs planned in Vibe Manager.
 | Phase | Status | Key Features |
 |-------|--------|--------------|
 | Phase 1: MVP Foundation | ✅ Complete | Dashboard, profiles, meetings, notes, local storage |
-| Phase 2: Enhanced Tracking | 🔄 Partial | Mood recording done; search/action items planned |
+| Phase 2: Enhanced Tracking | ✅ Complete | Mood observations, context tracking, mood history chart |
 | Phase 3: Knowledge Base | 🔄 Partial | Partner/children done; dates widget planned |
 | Phase 4: Career Development | 🔄 Partial | Level tracking done; skill matrix UI planned |
 | Phase 5: Smart Features | 📋 Planned | Not started |
@@ -74,17 +74,18 @@ Quick reference for what's implemented vs planned in Vibe Manager.
 | Note templates | 📋 Planned |
 | Reschedule/skip with reasons | 📋 Planned |
 
-### Mood/Health Tracking 🔄
+### Mood/Health Tracking ✅
 
 | Feature | Status |
 |---------|--------|
 | Record mood (F1-F5 in note viewer) | ✅ Done |
-| Mood stored in meeting frontmatter | ✅ Done |
+| Mood stored in entry frontmatter | ✅ Done |
 | Mood trends (Rising/Stable/Falling) | ✅ Done |
 | Dashboard mood indicators | ✅ Done |
 | Urgency scoring includes mood | ✅ Done |
-| Standalone mood entry (not tied to meeting) | 📋 Planned |
-| Context selection for observations | 📋 Planned |
+| Standalone mood entry (`m` key) | ✅ Done |
+| Context selection (Meeting/Standup/Slack/Other) | ✅ Done |
+| Mood history chart in engineer detail | ✅ Done |
 
 ### Career Tracking 🔄
 
@@ -116,8 +117,10 @@ Quick reference for what's implemented vs planned in Vibe Manager.
 | Key | Action |
 |-----|--------|
 | `n` | New meeting |
+| `m` | Record mood observation |
 | `Enter` | View selected meeting |
-| `e` | Edit profile |
+| `e` | Edit meeting from list |
+| `Del` | Delete selected entry |
 | `Esc` | Back to dashboard |
 
 ### Note Viewer
@@ -135,10 +138,11 @@ Quick reference for what's implemented vs planned in Vibe Manager.
 ### Storage Structure
 ```
 workspace/
-├── .vibe-manager           # Workspace config (YAML)
+├── .vibe-manager              # Workspace config (YAML)
 ├── engineer-slug/
-│   ├── _profile.md         # Engineer profile (YAML frontmatter)
-│   └── YYYY-MM-DD.md       # Meeting notes (optional mood in frontmatter)
+│   ├── _profile.md            # Engineer profile (YAML frontmatter)
+│   ├── YYYY-MM-DD.md          # Legacy meeting format (still supported)
+│   └── YYYY-MM-DDTHHMMSS.md   # Journal entry (meeting or mood observation)
 ```
 
 ### Profile Fields (Implemented)
@@ -149,10 +153,11 @@ workspace/
 - `children` - Children names (optional)
 - `skills` - Skills array (data exists, UI planned)
 
-### Meeting Fields (Implemented)
-- Filename is the date (YYYY-MM-DD.md)
+### Journal Entry Fields (Implemented)
+- Filename includes timestamp (YYYY-MM-DDTHHMMSS.md) or legacy date (YYYY-MM-DD.md)
 - `mood` - Optional mood score (1-5) in frontmatter
-- Markdown content for notes
+- `context` - Optional context (meeting/standup/slack/other) in frontmatter
+- Markdown content for notes (empty for pure mood observations)
 
 ---
 

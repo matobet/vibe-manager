@@ -4,13 +4,13 @@
 
 | Requirement | Status | Notes |
 |-------------|--------|-------|
-| FR-1: Record Mood Observation | ✅ Implemented | F1-F5 keys in note viewer |
-| FR-2: Context Selection | 📋 Planned | Currently mood tied to meetings only |
-| FR-3: Optional Notes | ✅ Implemented | Mood stored in meeting frontmatter |
-| FR-4: Mood History View | ✅ Implemented | Visible in engineer detail view |
+| FR-1: Record Mood Observation | ✅ Implemented | F1-F5 keys in note viewer, or `m` key for quick entry |
+| FR-2: Context Selection | ✅ Implemented | Meeting/Standup/Slack/Other via Tab key |
+| FR-3: Optional Notes | ✅ Implemented | Notes field in mood observation modal |
+| FR-4: Mood History View | ✅ Implemented | ASCII chart in engineer detail view |
 | FR-5: Trend Visualization | ✅ Implemented | Rising/Stable/Falling indicators |
 | FR-6: Dashboard Alerts | ✅ Implemented | Urgency score includes mood factors |
-| Standalone Mood Entry | 📋 Planned | Currently requires meeting context |
+| Standalone Mood Entry | ✅ Implemented | `m` key opens modal, not tied to meetings |
 
 ---
 
@@ -342,8 +342,11 @@ interface EngineerMoodComputed {
 
 ### Storage
 
-- Mood stored in YAML frontmatter of meeting files (`mood: 1-5`)
-- Each meeting can have one mood observation
+- Mood stored in YAML frontmatter of journal entry files (`mood: 1-5`)
+- Context stored in frontmatter (`context: meeting|standup|slack|other`)
+- Entries use timestamp-based filenames (`YYYY-MM-DDTHHMMSS.md`)
+- Legacy date-only filenames (`YYYY-MM-DD.md`) still supported
+- Multiple entries per day supported (different timestamps)
 - No remote sync (local-only by design)
 
 ---

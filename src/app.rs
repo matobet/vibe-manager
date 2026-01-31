@@ -8,8 +8,8 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 use crate::model::{
-    compute_engineer_summary, compute_workspace_summary, Engineer, EngineerSummary, Meeting,
-    Workspace, WorkspaceSummary,
+    compute_engineer_summary, compute_workspace_summary, Context, Engineer, EngineerSummary,
+    JournalEntry, Workspace, WorkspaceSummary,
 };
 
 /// Status message display duration
@@ -39,6 +39,7 @@ pub enum ViewMode {
     NoteViewer,
     NewEngineerModal,
     DeleteConfirmModal,
+    EntryInputModal,
     Help,
 }
 
@@ -79,6 +80,12 @@ pub enum Msg {
     },
     CancelModal,
 
+    // Entry input modal actions (mood observation)
+    ShowEntryInput,
+    SetEntryMood(u8),
+    CycleEntryContext,
+    SaveEntry,
+
     // Data refresh
     RefreshData,
 
@@ -92,7 +99,7 @@ pub enum Msg {
 pub struct App {
     pub workspace: Workspace,
     pub engineers: Vec<Engineer>,
-    pub meetings_by_engineer: Vec<Vec<Meeting>>,
+    pub entries_by_engineer: Vec<Vec<JournalEntry>>,
     pub summaries: Vec<EngineerSummary>,
     pub workspace_summary: WorkspaceSummary,
 
@@ -100,7 +107,7 @@ pub struct App {
     pub view_mode: ViewMode,
     pub selected_index: usize,
     pub selected_engineer_index: Option<usize>,
-    pub selected_meeting_index: Option<usize>,
+    pub selected_entry_index: Option<usize>,
 
     // Note viewer state
     pub editor_content: String,
@@ -111,10 +118,26 @@ pub struct App {
     pub modal_field_index: usize,
     pub modal_fields: Vec<String>,
 
+    // Entry input modal state
+    pub pending_entry_mood: Option<u8>,
+    pub pending_entry_context: Context,
+    pub pending_entry_notes: String,
+
     // App state
     pub should_quit: bool,
     pub status_message: Option<(String, Instant)>,
-    pub delete_from_list: bool, // Track if delete was initiated from meeting list
+    pub delete_from_list: bool, // Track if delete was initiated from entry list
+}
+
+// Backwards compatibility alias
+impl App {
+    pub fn meetings_by_engineer(&self) -> &Vec<Vec<JournalEntry>> {
+        &self.entries_by_engineer
+    }
+
+    pub fn selected_meeting_index(&self) -> Option<usize> {
+        self.selected_entry_index
+    }
 }
 
 impl App {
@@ -125,7 +148,7 @@ impl App {
         let mut app = App {
             workspace,
             engineers: Vec::new(),
-            meetings_by_engineer: Vec::new(),
+            entries_by_engineer: Vec::new(),
             summaries: Vec::new(),
             workspace_summary: WorkspaceSummary {
                 team_size: 0,
@@ -136,12 +159,15 @@ impl App {
             view_mode: ViewMode::Dashboard,
             selected_index: 0,
             selected_engineer_index: None,
-            selected_meeting_index: None,
+            selected_entry_index: None,
             editor_content: String::new(),
             editor_mood: None,
             modal_input: String::new(),
             modal_field_index: 0,
             modal_fields: Vec::new(),
+            pending_entry_mood: None,
+            pending_entry_context: Context::Standup,
+            pending_entry_notes: String::new(),
             should_quit: false,
             status_message: None,
             delete_from_list: false,
@@ -156,7 +182,7 @@ impl App {
         let engineer_dirs = storage::list_engineer_dirs(&self.workspace)?;
 
         self.engineers.clear();
-        self.meetings_by_engineer.clear();
+        self.entries_by_engineer.clear();
         self.summaries.clear();
 
         // Collect all engineer data
@@ -164,13 +190,13 @@ impl App {
             .into_iter()
             .filter_map(|dir| {
                 let engineer = storage::load_engineer(&dir).ok()?;
-                let meetings = storage::load_meetings(&dir).unwrap_or_default();
+                let entries = storage::load_entries(&dir).unwrap_or_default();
                 let summary = compute_engineer_summary(
                     &engineer,
-                    &meetings,
+                    &entries,
                     self.workspace.config.settings.overdue_threshold_days,
                 );
-                Some((engineer, meetings, summary))
+                Some((engineer, entries, summary))
             })
             .collect();
 
@@ -178,9 +204,9 @@ impl App {
         all_data.sort_by(|a, b| b.2.urgency_score.cmp(&a.2.urgency_score));
 
         // Unpack into separate vectors
-        for (engineer, meetings, summary) in all_data {
+        for (engineer, entries, summary) in all_data {
             self.engineers.push(engineer);
-            self.meetings_by_engineer.push(meetings);
+            self.entries_by_engineer.push(entries);
             self.summaries.push(summary);
         }
 
@@ -219,30 +245,35 @@ impl App {
         })
     }
 
-    /// Delete a meeting by engineer and meeting index
+    /// Delete an entry by engineer and entry index
     /// Returns Ok(()) on success, sets status message on error
-    pub fn delete_meeting(&mut self, eng_idx: usize, meet_idx: usize) -> Result<()> {
-        let meeting = &self.meetings_by_engineer[eng_idx][meet_idx];
-        let path = meeting.path.clone();
+    pub fn delete_entry(&mut self, eng_idx: usize, entry_idx: usize) -> Result<()> {
+        let entry = &self.entries_by_engineer[eng_idx][entry_idx];
+        let path = entry.path.clone();
 
         // Delete the file
         std::fs::remove_file(&path)?;
 
         // Remove from in-memory list
-        self.meetings_by_engineer[eng_idx].remove(meet_idx);
-        self.selected_meeting_index = None;
+        self.entries_by_engineer[eng_idx].remove(entry_idx);
+        self.selected_entry_index = None;
 
         // Recompute summary for this engineer
         let engineer = &self.engineers[eng_idx];
-        let meetings = &self.meetings_by_engineer[eng_idx];
+        let entries = &self.entries_by_engineer[eng_idx];
         self.summaries[eng_idx] = compute_engineer_summary(
             engineer,
-            meetings,
+            entries,
             self.workspace.config.settings.overdue_threshold_days,
         );
         self.workspace_summary = compute_workspace_summary(&self.summaries);
 
         Ok(())
+    }
+
+    /// Backwards compatibility alias
+    pub fn delete_meeting(&mut self, eng_idx: usize, meet_idx: usize) -> Result<()> {
+        self.delete_entry(eng_idx, meet_idx)
     }
 
     /// Process a message and update state (TEA update function)
@@ -266,14 +297,19 @@ impl App {
                     }
                     ViewMode::NoteViewer => {
                         self.view_mode = ViewMode::EngineerDetail;
-                        self.selected_meeting_index = None;
+                        self.selected_entry_index = None;
                     }
                     ViewMode::Help | ViewMode::NewEngineerModal => {
                         self.view_mode = ViewMode::Dashboard;
                     }
+                    ViewMode::EntryInputModal => {
+                        self.view_mode = ViewMode::EngineerDetail;
+                        self.pending_entry_mood = None;
+                        self.pending_entry_notes.clear();
+                    }
                     ViewMode::DeleteConfirmModal => {
                         if self.delete_from_list {
-                            self.selected_meeting_index = None;
+                            self.selected_entry_index = None;
                             self.view_mode = ViewMode::EngineerDetail;
                         } else {
                             self.view_mode = ViewMode::NoteViewer;
@@ -336,16 +372,13 @@ impl App {
                 Effect::None
             }
 
-            Msg::ViewMeeting(index) => {
-                if let Some(eng_idx) = self.selected_engineer_index {
-                    let meetings_len = self.meetings_by_engineer[eng_idx].len();
-                    if index < meetings_len {
-                        // Convert display index to array index (display shows newest first)
-                        let actual_index = meetings_len - 1 - index;
-                        self.selected_meeting_index = Some(actual_index);
-                        let meeting = &self.meetings_by_engineer[eng_idx][actual_index];
-                        self.editor_content = meeting.content.clone();
-                        self.editor_mood = meeting.mood();
+            Msg::ViewMeeting(display_index) => {
+                if let Some(actual_index) = self.meeting_display_to_entry_index(display_index) {
+                    if let Some(eng_idx) = self.selected_engineer_index {
+                        self.selected_entry_index = Some(actual_index);
+                        let entry = &self.entries_by_engineer[eng_idx][actual_index];
+                        self.editor_content = entry.content.clone();
+                        self.editor_mood = entry.mood();
                         self.view_mode = ViewMode::NoteViewer;
                     }
                 }
@@ -359,9 +392,9 @@ impl App {
                         Ok(meeting) => {
                             self.editor_content = meeting.content.clone();
                             self.editor_mood = None;
-                            self.meetings_by_engineer[eng_idx].push(meeting);
-                            self.selected_meeting_index =
-                                Some(self.meetings_by_engineer[eng_idx].len() - 1);
+                            self.entries_by_engineer[eng_idx].push(meeting);
+                            self.selected_entry_index =
+                                Some(self.entries_by_engineer[eng_idx].len() - 1);
                             self.view_mode = ViewMode::NoteViewer;
                             return Ok(Effect::SpawnEditor { is_new: true });
                         }
@@ -375,16 +408,13 @@ impl App {
 
             Msg::EditMeeting => Effect::SpawnEditor { is_new: false },
 
-            Msg::EditMeetingFromList(index) => {
-                if let Some(eng_idx) = self.selected_engineer_index {
-                    let meetings_len = self.meetings_by_engineer[eng_idx].len();
-                    if index < meetings_len {
-                        // Convert display index to array index (display shows newest first)
-                        let actual_index = meetings_len - 1 - index;
-                        self.selected_meeting_index = Some(actual_index);
-                        let meeting = &self.meetings_by_engineer[eng_idx][actual_index];
-                        self.editor_content = meeting.content.clone();
-                        self.editor_mood = meeting.mood();
+            Msg::EditMeetingFromList(display_index) => {
+                if let Some(actual_index) = self.meeting_display_to_entry_index(display_index) {
+                    if let Some(eng_idx) = self.selected_engineer_index {
+                        self.selected_entry_index = Some(actual_index);
+                        let entry = &self.entries_by_engineer[eng_idx][actual_index];
+                        self.editor_content = entry.content.clone();
+                        self.editor_mood = entry.mood();
                         // Don't change view mode - go straight to editor
                         return Ok(Effect::SpawnEditor { is_new: false });
                     }
@@ -396,9 +426,9 @@ impl App {
                 self.editor_mood = Some(mood);
                 // Save mood to disk immediately
                 if let (Some(eng_idx), Some(meet_idx)) =
-                    (self.selected_engineer_index, self.selected_meeting_index)
+                    (self.selected_engineer_index, self.selected_entry_index)
                 {
-                    let meeting = &mut self.meetings_by_engineer[eng_idx][meet_idx];
+                    let meeting = &mut self.entries_by_engineer[eng_idx][meet_idx];
                     meeting.frontmatter.mood = Some(mood);
                     if let Err(e) = storage::save_meeting(meeting) {
                         self.set_status(format!("Error saving mood: {}", e));
@@ -412,20 +442,17 @@ impl App {
             Msg::ShowDeleteConfirm => {
                 // Handle delete from both NoteViewer and EngineerDetail
                 if self.view_mode == ViewMode::NoteViewer {
-                    // Already viewing a meeting - selected_meeting_index already set
+                    // Already viewing a meeting - selected_entry_index already set
                     self.delete_from_list = false;
                     self.view_mode = ViewMode::DeleteConfirmModal;
                 } else if self.view_mode == ViewMode::EngineerDetail {
-                    // Deleting from the meeting list
-                    if let Some(eng_idx) = self.selected_engineer_index {
-                        let meetings_len = self.meetings_by_engineer[eng_idx].len();
-                        if self.selected_index < meetings_len {
-                            // Convert display index to array index (display shows newest first)
-                            let actual_index = meetings_len - 1 - self.selected_index;
-                            self.selected_meeting_index = Some(actual_index);
-                            self.delete_from_list = true;
-                            self.view_mode = ViewMode::DeleteConfirmModal;
-                        }
+                    // Deleting from the meeting list - map display index to entry index
+                    if let Some(actual_index) =
+                        self.meeting_display_to_entry_index(self.selected_index)
+                    {
+                        self.selected_entry_index = Some(actual_index);
+                        self.delete_from_list = true;
+                        self.view_mode = ViewMode::DeleteConfirmModal;
                     }
                 }
                 Effect::None
@@ -433,7 +460,7 @@ impl App {
 
             Msg::ConfirmDelete => {
                 if let (Some(eng_idx), Some(meet_idx)) =
-                    (self.selected_engineer_index, self.selected_meeting_index)
+                    (self.selected_engineer_index, self.selected_entry_index)
                 {
                     match self.delete_meeting(eng_idx, meet_idx) {
                         Ok(()) => {
@@ -500,15 +527,78 @@ impl App {
                         self.modal_input.clear();
                         self.modal_fields.clear();
                     }
+                    ViewMode::EntryInputModal => {
+                        self.view_mode = ViewMode::EngineerDetail;
+                        self.pending_entry_mood = None;
+                        self.pending_entry_notes.clear();
+                    }
                     ViewMode::DeleteConfirmModal => {
                         if self.delete_from_list {
-                            self.selected_meeting_index = None;
+                            self.selected_entry_index = None;
                             self.view_mode = ViewMode::EngineerDetail;
                         } else {
                             self.view_mode = ViewMode::NoteViewer;
                         }
                     }
                     _ => {}
+                }
+                Effect::None
+            }
+
+            // Entry input modal actions (mood observation)
+            Msg::ShowEntryInput => {
+                if self.selected_engineer_index.is_some() {
+                    self.pending_entry_mood = None;
+                    self.pending_entry_context = Context::Standup;
+                    self.pending_entry_notes.clear();
+                    self.view_mode = ViewMode::EntryInputModal;
+                }
+                Effect::None
+            }
+
+            Msg::SetEntryMood(mood) => {
+                if self.view_mode == ViewMode::EntryInputModal {
+                    self.pending_entry_mood = Some(mood);
+                }
+                Effect::None
+            }
+
+            Msg::CycleEntryContext => {
+                if self.view_mode == ViewMode::EntryInputModal {
+                    self.pending_entry_context = self.pending_entry_context.next();
+                }
+                Effect::None
+            }
+
+            Msg::SaveEntry => {
+                if let Some(eng_idx) = self.selected_engineer_index {
+                    let engineer = &self.engineers[eng_idx];
+                    match storage::create_entry(
+                        &engineer.path,
+                        self.pending_entry_mood,
+                        Some(self.pending_entry_context),
+                        self.pending_entry_notes.clone(),
+                    ) {
+                        Ok(entry) => {
+                            self.entries_by_engineer[eng_idx].push(entry);
+                            // Recompute summary
+                            let engineer = &self.engineers[eng_idx];
+                            let entries = &self.entries_by_engineer[eng_idx];
+                            self.summaries[eng_idx] = compute_engineer_summary(
+                                engineer,
+                                entries,
+                                self.workspace.config.settings.overdue_threshold_days,
+                            );
+                            self.workspace_summary = compute_workspace_summary(&self.summaries);
+                            self.set_status("Observation recorded");
+                        }
+                        Err(e) => {
+                            self.set_status(format!("Error: {}", e));
+                        }
+                    }
+                    self.pending_entry_mood = None;
+                    self.pending_entry_notes.clear();
+                    self.view_mode = ViewMode::EngineerDetail;
                 }
                 Effect::None
             }
@@ -523,6 +613,8 @@ impl App {
                     && self.modal_field_index < self.modal_fields.len()
                 {
                     self.modal_fields[self.modal_field_index].push(c);
+                } else if self.view_mode == ViewMode::EntryInputModal {
+                    self.pending_entry_notes.push(c);
                 }
                 Effect::None
             }
@@ -532,6 +624,8 @@ impl App {
                     && self.modal_field_index < self.modal_fields.len()
                 {
                     self.modal_fields[self.modal_field_index].pop();
+                } else if self.view_mode == ViewMode::EntryInputModal {
+                    self.pending_entry_notes.pop();
                 }
                 Effect::None
             }
@@ -559,17 +653,47 @@ impl App {
         Ok(effect)
     }
 
-    /// Get meetings for currently selected engineer
-    pub fn selected_meetings(&self) -> Option<&Vec<Meeting>> {
+    /// Get entries for currently selected engineer
+    pub fn selected_entries(&self) -> Option<&Vec<JournalEntry>> {
         self.selected_engineer_index
-            .and_then(|i| self.meetings_by_engineer.get(i))
+            .and_then(|i| self.entries_by_engineer.get(i))
+    }
+
+    /// Get only meetings (entries with content) for currently selected engineer
+    pub fn selected_meetings(&self) -> Vec<&JournalEntry> {
+        self.selected_entries()
+            .map(|entries| entries.iter().filter(|e| e.is_meeting()).collect())
+            .unwrap_or_default()
+    }
+
+    /// Get the number of meetings for currently selected engineer
+    pub fn selected_meeting_count(&self) -> usize {
+        self.selected_entries()
+            .map(|entries| entries.iter().filter(|e| e.is_meeting()).count())
+            .unwrap_or(0)
+    }
+
+    /// Convert a display index (in the meetings list) to the actual entry index
+    /// Display shows meetings in reverse chronological order (newest first)
+    pub fn meeting_display_to_entry_index(&self, display_index: usize) -> Option<usize> {
+        let entries = self.selected_entries()?;
+        let meeting_indices: Vec<usize> = entries
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.is_meeting())
+            .map(|(i, _)| i)
+            .collect();
+
+        // Display is reversed (newest first), so map accordingly
+        let reversed_idx = meeting_indices.len().checked_sub(1 + display_index)?;
+        meeting_indices.get(reversed_idx).copied()
     }
 
     /// Get the length of the currently navigable list based on view mode
     fn current_list_len(&self) -> usize {
         match self.view_mode {
             ViewMode::Dashboard => self.engineers.len(),
-            ViewMode::EngineerDetail => self.selected_meetings().map(|m| m.len()).unwrap_or(0),
+            ViewMode::EngineerDetail => self.selected_meeting_count(),
             _ => 0,
         }
     }
@@ -613,20 +737,21 @@ pub fn handle_key_event(app: &App, key: KeyEvent) -> Option<Msg> {
             KeyCode::Char('g') => Some(Msg::SelectFirst),
             KeyCode::Char('G') => Some(Msg::SelectLast),
             KeyCode::Enter | KeyCode::Char('l') | KeyCode::Right => {
-                if app.selected_index < app.selected_meetings().map(|m| m.len()).unwrap_or(0) {
+                if app.selected_index < app.selected_meeting_count() {
                     Some(Msg::ViewMeeting(app.selected_index))
                 } else {
                     None
                 }
             }
             KeyCode::Char('e') => {
-                if app.selected_index < app.selected_meetings().map(|m| m.len()).unwrap_or(0) {
+                if app.selected_index < app.selected_meeting_count() {
                     Some(Msg::EditMeetingFromList(app.selected_index))
                 } else {
                     None
                 }
             }
             KeyCode::Char('n') => Some(Msg::NewMeeting),
+            KeyCode::Char('m') => Some(Msg::ShowEntryInput),
             KeyCode::Delete => Some(Msg::ShowDeleteConfirm),
             KeyCode::Char('?') => Some(Msg::ShowHelp),
             _ => None,
@@ -659,6 +784,20 @@ pub fn handle_key_event(app: &App, key: KeyEvent) -> Option<Msg> {
             KeyCode::Char(c) => Some(Msg::Input(c)),
             KeyCode::Backspace => Some(Msg::Backspace),
             KeyCode::Enter | KeyCode::Tab => Some(Msg::Enter),
+            _ => None,
+        },
+
+        ViewMode::EntryInputModal => match key.code {
+            KeyCode::Esc => Some(Msg::CancelModal),
+            KeyCode::Char('1') => Some(Msg::SetEntryMood(1)),
+            KeyCode::Char('2') => Some(Msg::SetEntryMood(2)),
+            KeyCode::Char('3') => Some(Msg::SetEntryMood(3)),
+            KeyCode::Char('4') => Some(Msg::SetEntryMood(4)),
+            KeyCode::Char('5') => Some(Msg::SetEntryMood(5)),
+            KeyCode::Tab => Some(Msg::CycleEntryContext),
+            KeyCode::Enter => Some(Msg::SaveEntry),
+            KeyCode::Backspace => Some(Msg::Backspace),
+            KeyCode::Char(c) => Some(Msg::Input(c)),
             _ => None,
         },
 

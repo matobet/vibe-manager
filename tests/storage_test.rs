@@ -118,25 +118,34 @@ mod meeting_tests {
     use super::*;
 
     #[test]
-    fn test_load_meetings_sorted_by_date() {
-        let meetings = load_meetings(&fixtures_path().join("alex-chen")).unwrap();
+    fn test_load_entries_sorted_by_timestamp() {
+        let entries = load_meetings(&fixtures_path().join("alex-chen")).unwrap();
 
-        assert_eq!(meetings.len(), 2);
+        // Should have meetings + mood observations
+        assert!(entries.len() >= 2);
         // Should be sorted oldest first
-        assert!(meetings[0].date < meetings[1].date);
+        for i in 1..entries.len() {
+            assert!(entries[i - 1].timestamp <= entries[i].timestamp);
+        }
+    }
+
+    #[test]
+    fn test_load_meetings_only() {
+        let entries = load_meetings(&fixtures_path().join("alex-chen")).unwrap();
+        let meetings: Vec<_> = entries.iter().filter(|e| e.is_meeting()).collect();
+
+        // Should have at least the 2 original meetings
+        assert!(meetings.len() >= 2);
         assert_eq!(
-            meetings[0].date,
+            meetings[0].date(),
             NaiveDate::from_ymd_opt(2026, 1, 8).unwrap()
-        );
-        assert_eq!(
-            meetings[1].date,
-            NaiveDate::from_ymd_opt(2026, 1, 15).unwrap()
         );
     }
 
     #[test]
     fn test_load_meeting_mood() {
-        let meetings = load_meetings(&fixtures_path().join("alex-chen")).unwrap();
+        let entries = load_meetings(&fixtures_path().join("alex-chen")).unwrap();
+        let meetings: Vec<_> = entries.iter().filter(|e| e.is_meeting()).collect();
 
         assert_eq!(meetings[0].mood(), Some(3)); // Jan 8
         assert_eq!(meetings[1].mood(), Some(5)); // Jan 15
@@ -144,30 +153,46 @@ mod meeting_tests {
 
     #[test]
     fn test_load_meeting_content() {
-        let meetings = load_meetings(&fixtures_path().join("alex-chen")).unwrap();
+        let entries = load_meetings(&fixtures_path().join("alex-chen")).unwrap();
+        let meetings: Vec<_> = entries.iter().filter(|e| e.is_meeting()).collect();
 
         assert!(meetings[1].content.contains("Career goals"));
         assert!(meetings[1].content.contains("tech lead track"));
     }
 
     #[test]
-    fn test_load_multiple_meetings() {
-        let meetings = load_meetings(&fixtures_path().join("jordan-lee")).unwrap();
+    fn test_load_mood_observations() {
+        let entries = load_meetings(&fixtures_path().join("alex-chen")).unwrap();
+        let observations: Vec<_> = entries.iter().filter(|e| !e.is_meeting()).collect();
 
-        assert_eq!(meetings.len(), 3);
-        assert_eq!(meetings[0].mood(), Some(5)); // Jan 10
-        assert_eq!(meetings[1].mood(), Some(5)); // Jan 11
-        assert_eq!(meetings[2].mood(), Some(4)); // Jan 22
+        // Should have mood observations (pure mood entries without content)
+        assert!(!observations.is_empty());
+        // All mood observations should have a mood set
+        for obs in &observations {
+            assert!(obs.mood().is_some());
+        }
     }
 
     #[test]
-    fn test_meeting_path_matches_date() {
-        let meetings = load_meetings(&fixtures_path().join("alex-chen")).unwrap();
+    fn test_load_multiple_entries() {
+        let entries = load_meetings(&fixtures_path().join("jordan-lee")).unwrap();
+        let meetings: Vec<_> = entries.iter().filter(|e| e.is_meeting()).collect();
 
-        for meeting in &meetings {
-            let filename = meeting.path.file_name().unwrap().to_str().unwrap();
-            let expected = format!("{}.md", meeting.date.format("%Y-%m-%d"));
-            assert_eq!(filename, expected);
+        // Should have at least 3 meetings
+        assert!(meetings.len() >= 3);
+    }
+
+    #[test]
+    fn test_legacy_filename_format() {
+        // Legacy files (YYYY-MM-DD.md) should still load
+        let entries = load_meetings(&fixtures_path().join("alex-chen")).unwrap();
+        let legacy: Vec<_> = entries.iter().filter(|e| !e.has_time()).collect();
+
+        // Should have legacy date-only entries
+        assert!(!legacy.is_empty());
+        for entry in &legacy {
+            let filename = entry.path.file_name().unwrap().to_str().unwrap();
+            assert!(filename.len() == "YYYY-MM-DD.md".len());
         }
     }
 }

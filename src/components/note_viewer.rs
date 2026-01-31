@@ -10,7 +10,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::model::Meeting;
+use crate::model::JournalEntry;
 use crate::theme::{
     mood_color, mood_gauge, rpg_block, simple_block, style_header, style_muted, COLOR_PRIMARY,
     COLOR_SECONDARY,
@@ -20,15 +20,15 @@ use crate::theme::{
 const EMPTY_MOOD_DISPLAY: &str = "─────";
 
 pub struct NoteViewer<'a> {
-    meeting: &'a Meeting,
+    entry: &'a JournalEntry,
     content: &'a str,
     mood: Option<u8>,
 }
 
 impl<'a> NoteViewer<'a> {
-    pub fn new(meeting: &'a Meeting, content: &'a str, mood: Option<u8>) -> Self {
+    pub fn new(entry: &'a JournalEntry, content: &'a str, mood: Option<u8>) -> Self {
         Self {
-            meeting,
+            entry,
             content,
             mood,
         }
@@ -50,7 +50,7 @@ impl<'a> NoteViewer<'a> {
     }
 
     fn render_header(&self, frame: &mut Frame, area: Rect) {
-        let date_str = self.meeting.date.format("%B %d, %Y").to_string();
+        let date_str = self.entry.date().format("%B %d, %Y").to_string();
 
         let mood_display: Cow<'static, str> = self.mood.map_or_else(
             || Cow::Borrowed(EMPTY_MOOD_DISPLAY),

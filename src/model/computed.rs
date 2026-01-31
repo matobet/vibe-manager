@@ -1,7 +1,7 @@
 use chrono::Local;
 use ratatui::style::Color;
 
-use super::{Engineer, Meeting};
+use super::{Engineer, JournalEntry};
 use crate::utils::engineer_color;
 
 #[derive(Debug, Clone)]
@@ -39,13 +39,16 @@ impl MoodTrend {
 
 pub fn compute_engineer_summary(
     engineer: &Engineer,
-    meetings: &[Meeting],
+    entries: &[JournalEntry],
     overdue_threshold: u32,
 ) -> EngineerSummary {
     let today = Local::now().date_naive();
 
+    // For overdue calculation, only count "meetings" (entries with content)
+    let meetings: Vec<&JournalEntry> = entries.iter().filter(|e| e.is_meeting()).collect();
+
     // Find last meeting date
-    let last_meeting_date = meetings.iter().map(|m| m.date).max();
+    let last_meeting_date = meetings.iter().map(|m| m.date()).max();
 
     // Calculate days since last meeting
     let days_since_meeting = last_meeting_date.map(|d| (today - d).num_days());
@@ -56,12 +59,12 @@ pub fn compute_engineer_summary(
         .map(|days| days > frequency_days + overdue_threshold as i64)
         .unwrap_or(true); // No meetings = overdue
 
-    // Calculate mood trend from last 3 meetings
-    let recent_moods: Vec<u8> = meetings
+    // Calculate mood trend from last 5 entries (any type, not just meetings)
+    let recent_moods: Vec<u8> = entries
         .iter()
         .rev() // Most recent first
-        .take(3)
-        .filter_map(|m| m.mood())
+        .filter_map(|e| e.mood())
+        .take(5)
         .collect();
 
     let recent_mood = recent_moods.first().copied();

@@ -6,6 +6,9 @@ pub use meeting::*;
 pub use profile::*;
 pub use workspace::*;
 
+// Re-export journal entry functions with clearer names
+pub use meeting::{create_entry, load_entries, save_entry, update_entry_mood};
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]

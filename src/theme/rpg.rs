@@ -207,6 +207,8 @@ pub fn active_icon(is_active: bool) -> &'static str {
 }
 
 /// Mood trend with distinct shapes (not just arrows)
+// TODO: Consider changing from triangles (▲▼◆) to arrows (↑↓→) for better readability
+//       across different fonts and terminal emulators. Arrows are also more intuitive.
 pub fn mood_trend_icon(trend: Option<crate::model::MoodTrend>) -> &'static str {
     match trend {
         Some(crate::model::MoodTrend::Rising) => ICON_UP, // ▲

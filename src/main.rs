@@ -139,7 +139,7 @@ fn run_app(terminal: &mut app::Term, app: &mut App) -> Result<()> {
             ViewMode::Dashboard | ViewMode::Help | ViewMode::NewEngineerModal => {
                 render_dashboard_view(app, frame);
             }
-            ViewMode::EngineerDetail => {
+            ViewMode::EngineerDetail | ViewMode::EntryInputModal => {
                 render_detail_view(app, frame);
             }
             ViewMode::NoteViewer => {
@@ -187,22 +187,22 @@ fn run_app(terminal: &mut app::Term, app: &mut App) -> Result<()> {
     Ok(())
 }
 
-/// Suspend the TUI and spawn an external editor for the current meeting note
+/// Suspend the TUI and spawn an external editor for the current entry note
 ///
-/// If `is_new` is true, this is a newly created meeting. If the user saves an empty
-/// file (whitespace only), the meeting is canceled and the file is deleted.
+/// If `is_new` is true, this is a newly created entry. If the user saves an empty
+/// file (whitespace only), the entry is canceled and the file is deleted.
 fn suspend_and_edit(terminal: &mut app::Term, app: &mut App, is_new: bool) -> Result<()> {
-    // Get the meeting file path
-    let (eng_idx, meet_idx) = match (app.selected_engineer_index, app.selected_meeting_index) {
+    // Get the entry file path
+    let (eng_idx, entry_idx) = match (app.selected_engineer_index, app.selected_entry_index) {
         (Some(e), Some(m)) => (e, m),
         _ => {
-            app.set_status("No meeting selected");
+            app.set_status("No entry selected");
             return Ok(());
         }
     };
 
-    let meeting = &app.meetings_by_engineer[eng_idx][meet_idx];
-    let file_path = meeting.path.clone();
+    let entry = &app.entries_by_engineer[eng_idx][entry_idx];
+    let file_path = entry.path.clone();
 
     // Leave alternate screen and disable raw mode
     execute!(
@@ -237,14 +237,14 @@ fn suspend_and_edit(terminal: &mut app::Term, app: &mut App, is_new: bool) -> Re
 
             // Check if content is empty/whitespace only (user wants to cancel)
             if raw_content.trim().is_empty() || is_content_empty(&raw_content) {
-                // Delete the meeting using shared helper
-                match app.delete_meeting(eng_idx, meet_idx) {
+                // Delete the entry using shared helper
+                match app.delete_entry(eng_idx, entry_idx) {
                     Ok(()) => {
                         app.view_mode = app::ViewMode::EngineerDetail;
                         app.set_status(if is_new {
-                            "Meeting creation canceled"
+                            "Entry creation canceled"
                         } else {
-                            "Meeting deleted"
+                            "Entry deleted"
                         });
                     }
                     Err(e) => {
@@ -252,31 +252,31 @@ fn suspend_and_edit(terminal: &mut app::Term, app: &mut App, is_new: bool) -> Re
                     }
                 }
             } else if editor_result.modified {
-                // Parse frontmatter and body separately (same as load_meeting does)
+                // Parse frontmatter and body separately
                 let (frontmatter_yaml, body) = storage::parse_frontmatter(&raw_content);
 
                 // Update frontmatter if present (user may have edited mood in file)
                 if let Some(yaml) = frontmatter_yaml {
                     if let Ok(fm) = serde_yaml::from_str(yaml) {
-                        app.meetings_by_engineer[eng_idx][meet_idx].frontmatter = fm;
+                        app.entries_by_engineer[eng_idx][entry_idx].frontmatter = fm;
                         app.editor_mood =
-                            app.meetings_by_engineer[eng_idx][meet_idx].frontmatter.mood;
+                            app.entries_by_engineer[eng_idx][entry_idx].frontmatter.mood;
                     }
                 }
 
                 // Update with body content only (without frontmatter)
                 let body_content = body.to_string();
                 app.editor_content = body_content.clone();
-                app.meetings_by_engineer[eng_idx][meet_idx].content = body_content;
+                app.entries_by_engineer[eng_idx][entry_idx].content = body_content;
                 app.set_status("Note updated");
             } else {
                 app.set_status("No changes");
             }
         }
         Err(e) => {
-            // If editor failed on a new meeting, clean up the file
+            // If editor failed on a new entry, clean up the file
             if is_new {
-                let _ = app.delete_meeting(eng_idx, meet_idx);
+                let _ = app.delete_entry(eng_idx, entry_idx);
                 app.view_mode = app::ViewMode::EngineerDetail;
             }
             app.set_status(format!("Editor error: {}", e));

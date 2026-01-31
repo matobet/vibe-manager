@@ -49,7 +49,7 @@ This roadmap outlines the phased development approach for Vibe Manager, from MVP
 
 ---
 
-## Phase 2: Enhanced Tracking 🔄 PARTIAL
+## Phase 2: Enhanced Tracking ✅ COMPLETE
 
 **Focus**: Mood tracking and improved note management
 
@@ -66,15 +66,19 @@ This roadmap outlines the phased development approach for Vibe Manager, from MVP
 | Mood history | View trends per engineer | P0 | ✅ Done |
 | Mood on dashboard | Trend indicators in overview | P0 | ✅ Done |
 | Note history | View all notes per engineer | P0 | ✅ Done |
+| Standalone mood entry | Quick observation without meeting | P0 | ✅ Done |
+| Context selection | Meeting/Standup/Slack/Other | P0 | ✅ Done |
+| Mood history chart | ASCII chart in engineer detail | P0 | ✅ Done |
 | Note search | Find across all notes | P1 | 📋 Planned |
 | Action items | Track follow-ups from notes | P1 | 📋 Planned |
 | Reschedule/skip | Handle meeting changes | P1 | 📋 Planned |
 
 ### Success Criteria
-- Can record and view mood trends
-- Dashboard shows mood alerts
-- Can search through historical notes
-- Action items can be tracked
+- ✅ Can record and view mood trends
+- ✅ Dashboard shows mood alerts
+- ✅ Can record mood observations anytime (not just in meetings)
+- 📋 Can search through historical notes
+- 📋 Action items can be tracked
 
 ---
 

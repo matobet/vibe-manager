@@ -35,7 +35,7 @@ impl<'a> StatusBar<'a> {
         // Left side: mode and context
         let mode_str = match self.view_mode {
             ViewMode::Dashboard => "DASHBOARD",
-            ViewMode::EngineerDetail => "ENGINEER",
+            ViewMode::EngineerDetail | ViewMode::EntryInputModal => "ENGINEER",
             ViewMode::NoteViewer | ViewMode::DeleteConfirmModal => "NOTE",
             ViewMode::NewEngineerModal => "NEW ENGINEER",
             ViewMode::Help => "HELP",
@@ -71,10 +71,11 @@ impl<'a> StatusBar<'a> {
         // Right side: keybindings hint
         let hints = match self.view_mode {
             ViewMode::Dashboard => "h/l:nav  Enter:view  n:new  ?:help  q:quit",
-            ViewMode::EngineerDetail => "e:edit  n:new  Del:delete  Enter:view  Bksp:back",
+            ViewMode::EngineerDetail => "e:edit  n:new  m:mood  Del:delete  Enter:view  Bksp:back",
             ViewMode::NoteViewer | ViewMode::DeleteConfirmModal => {
                 "e:edit  Del:delete  F1-F5:mood  Bksp:back"
             }
+            ViewMode::EntryInputModal => "1-5:mood  Tab:context  Enter:save  Esc:cancel",
             ViewMode::Help => "?/Esc:close",
             _ => "Esc:cancel  Enter:confirm",
         };

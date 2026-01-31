@@ -1,5 +1,10 @@
 name: CI
 
+# TODO: Add code coverage tracking with cargo-llvm-cov
+#   - Install: cargo install cargo-llvm-cov
+#   - Generate LCOV: cargo llvm-cov --lcov --output-path lcov.info
+#   - Upload to Codecov or Coveralls for tracking coverage over time
+
 on:
   push:
     branches: [main]

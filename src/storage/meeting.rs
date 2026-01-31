@@ -1,17 +1,19 @@
 use std::fs;
 use std::path::Path;
 
-use chrono::{Local, NaiveDate};
+use chrono::{Local, NaiveDate, NaiveDateTime};
 
 use super::{parse_frontmatter, StorageError, StorageResult};
-use crate::model::{parse_meeting_date, Meeting, MeetingFrontmatter};
+use crate::model::{
+    format_entry_filename, parse_entry_timestamp, Context, JournalEntry, JournalEntryFrontmatter,
+};
 
-/// Load all meetings for an engineer
-pub fn load_meetings(engineer_dir: &Path) -> StorageResult<Vec<Meeting>> {
-    let mut meetings = Vec::new();
+/// Load all entries for an engineer
+pub fn load_entries(engineer_dir: &Path) -> StorageResult<Vec<JournalEntry>> {
+    let mut entries = Vec::new();
 
-    for entry in fs::read_dir(engineer_dir)? {
-        let path = entry?.path();
+    for dir_entry in fs::read_dir(engineer_dir)? {
+        let path = dir_entry?.path();
 
         if !path.is_file() {
             continue;
@@ -19,56 +21,107 @@ pub fn load_meetings(engineer_dir: &Path) -> StorageResult<Vec<Meeting>> {
 
         let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
-        // Skip non-meeting files
+        // Skip non-entry files
         if filename.starts_with('_') || !filename.ends_with(".md") {
             continue;
         }
 
-        // Try to parse as meeting date
-        if let Some(date) = parse_meeting_date(filename) {
-            if let Ok(meeting) = load_meeting(&path, date) {
-                meetings.push(meeting);
+        // Try to parse as entry timestamp
+        if let Some(timestamp) = parse_entry_timestamp(filename) {
+            if let Ok(entry) = load_entry(&path, timestamp) {
+                entries.push(entry);
             }
         }
     }
 
-    // Sort by date (oldest first)
-    meetings.sort_by_key(|m| m.date);
+    // Sort by timestamp (oldest first)
+    entries.sort_by_key(|e| e.timestamp);
 
-    Ok(meetings)
+    Ok(entries)
 }
 
-/// Load a single meeting
-pub fn load_meeting(path: &Path, date: NaiveDate) -> StorageResult<Meeting> {
+/// Load a single entry
+pub fn load_entry(path: &Path, timestamp: NaiveDateTime) -> StorageResult<JournalEntry> {
     let content = fs::read_to_string(path)?;
     let (frontmatter, body) = parse_frontmatter(&content);
 
-    let fm: MeetingFrontmatter = match frontmatter {
+    let fm: JournalEntryFrontmatter = match frontmatter {
         Some(yaml) if !yaml.is_empty() => serde_yaml::from_str(yaml)?,
-        _ => MeetingFrontmatter::default(),
+        _ => JournalEntryFrontmatter::default(),
     };
 
-    Ok(Meeting::new(date, path.to_path_buf(), fm, body.to_string()))
+    Ok(JournalEntry::new(
+        timestamp,
+        path.to_path_buf(),
+        fm,
+        body.to_string(),
+    ))
 }
 
-/// Save meeting
-pub fn save_meeting(meeting: &Meeting) -> StorageResult<()> {
-    let yaml = serde_yaml::to_string(&meeting.frontmatter)?;
-    let content = format!("---\n{}---\n\n{}", yaml, meeting.content);
-    fs::write(&meeting.path, content)?;
+/// Save entry to disk
+pub fn save_entry(entry: &JournalEntry) -> StorageResult<()> {
+    let yaml = serde_yaml::to_string(&entry.frontmatter)?;
+    let content = format!("---\n{}---\n\n{}", yaml, entry.content);
+    fs::write(&entry.path, content)?;
     Ok(())
 }
 
-/// Create new meeting for today
-pub fn create_meeting(engineer_dir: &Path, date: Option<NaiveDate>) -> StorageResult<Meeting> {
-    let date = date.unwrap_or_else(|| Local::now().date_naive());
-    let filename = format!("{}.md", date.format("%Y-%m-%d"));
+/// Create a new entry (mood observation or meeting)
+pub fn create_entry(
+    engineer_dir: &Path,
+    mood: Option<u8>,
+    context: Option<Context>,
+    notes: String,
+) -> StorageResult<JournalEntry> {
+    let timestamp = Local::now().naive_local();
+    let filename = format_entry_filename(timestamp);
+    let path = engineer_dir.join(&filename);
+
+    if path.exists() {
+        return Err(StorageError::InvalidWorkspace(format!(
+            "Entry already exists for {}",
+            timestamp
+        )));
+    }
+
+    let frontmatter = JournalEntryFrontmatter { mood, context };
+    let entry = JournalEntry::new(timestamp, path, frontmatter, notes);
+
+    save_entry(&entry)?;
+    Ok(entry)
+}
+
+/// Create a new 1-on-1 meeting with template content
+pub fn create_meeting(engineer_dir: &Path, date: Option<NaiveDate>) -> StorageResult<JournalEntry> {
+    let timestamp = if let Some(d) = date {
+        // For explicit dates, check if there's already a legacy file
+        let legacy_filename = format!("{}.md", d.format("%Y-%m-%d"));
+        let legacy_path = engineer_dir.join(&legacy_filename);
+        if legacy_path.exists() {
+            return Err(StorageError::InvalidWorkspace(format!(
+                "Meeting already exists for {}",
+                d
+            )));
+        }
+        // Use midnight for explicit dates (backwards compat for tests)
+        d.and_hms_opt(0, 0, 0).unwrap()
+    } else {
+        Local::now().naive_local()
+    };
+
+    // For new meetings, use timestamp-based filename
+    let filename = if date.is_some() {
+        // Legacy format for explicit dates
+        format!("{}.md", timestamp.date().format("%Y-%m-%d"))
+    } else {
+        format_entry_filename(timestamp)
+    };
     let path = engineer_dir.join(&filename);
 
     if path.exists() {
         return Err(StorageError::InvalidWorkspace(format!(
             "Meeting already exists for {}",
-            date
+            timestamp
         )));
     }
 
@@ -77,24 +130,41 @@ pub fn create_meeting(engineer_dir: &Path, date: Option<NaiveDate>) -> StorageRe
          ## Discussion\n\n\
          ## Notes\n\n\
          ## Action Items\n- [ ] \n",
-        date.format("%B %d, %Y")
+        timestamp.date().format("%B %d, %Y")
     );
 
-    let meeting = Meeting::new(date, path, MeetingFrontmatter::default(), content);
+    let frontmatter = JournalEntryFrontmatter {
+        mood: None,
+        context: Some(Context::Meeting),
+    };
+    let entry = JournalEntry::new(timestamp, path, frontmatter, content);
 
-    save_meeting(&meeting)?;
-    Ok(meeting)
+    save_entry(&entry)?;
+    Ok(entry)
 }
 
-/// Update meeting mood
-pub fn update_meeting_mood(meeting: &mut Meeting, mood: u8) -> StorageResult<()> {
+/// Update entry mood
+pub fn update_entry_mood(entry: &mut JournalEntry, mood: u8) -> StorageResult<()> {
     if !(1..=5).contains(&mood) {
         return Err(StorageError::InvalidWorkspace(
             "Mood must be between 1 and 5".to_string(),
         ));
     }
-    meeting.frontmatter.mood = Some(mood);
-    save_meeting(meeting)
+    entry.frontmatter.mood = Some(mood);
+    save_entry(entry)
+}
+
+// Backwards compatibility aliases
+pub fn load_meetings(engineer_dir: &Path) -> StorageResult<Vec<JournalEntry>> {
+    load_entries(engineer_dir)
+}
+
+pub fn save_meeting(entry: &JournalEntry) -> StorageResult<()> {
+    save_entry(entry)
+}
+
+pub fn update_meeting_mood(entry: &mut JournalEntry, mood: u8) -> StorageResult<()> {
+    update_entry_mood(entry, mood)
 }
 
 #[cfg(test)]
@@ -108,23 +178,110 @@ mod tests {
         let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
 
         let created = create_meeting(temp.path(), Some(date)).unwrap();
-        assert_eq!(created.date, date);
+        assert_eq!(created.date(), date);
         assert!(created.content.contains("January 15, 2026"));
 
-        let meetings = load_meetings(temp.path()).unwrap();
-        assert_eq!(meetings.len(), 1);
-        assert_eq!(meetings[0].date, date);
+        let entries = load_entries(temp.path()).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].date(), date);
     }
 
     #[test]
-    fn test_meeting_mood() {
+    fn test_entry_mood() {
         let temp = TempDir::new().unwrap();
         let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
 
-        let mut meeting = create_meeting(temp.path(), Some(date)).unwrap();
-        update_meeting_mood(&mut meeting, 4).unwrap();
+        let mut entry = create_meeting(temp.path(), Some(date)).unwrap();
+        update_entry_mood(&mut entry, 4).unwrap();
 
-        let loaded = load_meetings(temp.path()).unwrap();
+        let loaded = load_entries(temp.path()).unwrap();
         assert_eq!(loaded[0].mood(), Some(4));
+    }
+
+    #[test]
+    fn test_create_mood_entry() {
+        let temp = TempDir::new().unwrap();
+
+        let entry = create_entry(
+            temp.path(),
+            Some(4),
+            Some(Context::Standup),
+            "Quick check-in, seemed energized.".to_string(),
+        )
+        .unwrap();
+
+        assert_eq!(entry.mood(), Some(4));
+        assert_eq!(entry.frontmatter.context, Some(Context::Standup));
+        assert!(entry.has_time()); // Should have actual time
+
+        let loaded = load_entries(temp.path()).unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].mood(), Some(4));
+        assert_eq!(loaded[0].frontmatter.context, Some(Context::Standup));
+    }
+
+    #[test]
+    fn test_load_legacy_filename() {
+        let temp = TempDir::new().unwrap();
+        let path = temp.path().join("2026-01-20.md");
+
+        fs::write(&path, "---\nmood: 3\n---\n\n# 1-on-1\n\nSome content.").unwrap();
+
+        let entries = load_entries(temp.path()).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(
+            entries[0].date(),
+            NaiveDate::from_ymd_opt(2026, 1, 20).unwrap()
+        );
+        assert!(!entries[0].has_time()); // Legacy files have no time
+        assert_eq!(entries[0].mood(), Some(3));
+    }
+
+    #[test]
+    fn test_load_timestamp_filename() {
+        let temp = TempDir::new().unwrap();
+        let path = temp.path().join("2026-01-20T143000.md");
+
+        fs::write(
+            &path,
+            "---\nmood: 4\ncontext: standup\n---\n\nQuick observation.",
+        )
+        .unwrap();
+
+        let entries = load_entries(temp.path()).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(
+            entries[0].date(),
+            NaiveDate::from_ymd_opt(2026, 1, 20).unwrap()
+        );
+        assert!(entries[0].has_time());
+        assert_eq!(entries[0].mood(), Some(4));
+        assert_eq!(entries[0].frontmatter.context, Some(Context::Standup));
+    }
+
+    #[test]
+    fn test_multiple_entries_same_day() {
+        let temp = TempDir::new().unwrap();
+
+        // Create legacy file (midnight)
+        fs::write(
+            temp.path().join("2026-01-20.md"),
+            "---\nmood: 3\n---\n\n# Morning 1-on-1",
+        )
+        .unwrap();
+
+        // Create timestamp file (afternoon)
+        fs::write(
+            temp.path().join("2026-01-20T143000.md"),
+            "---\nmood: 4\ncontext: other\n---\n\nAfternoon chat.",
+        )
+        .unwrap();
+
+        let entries = load_entries(temp.path()).unwrap();
+        assert_eq!(entries.len(), 2);
+
+        // Should be sorted by timestamp
+        assert!(!entries[0].has_time()); // Midnight first
+        assert!(entries[1].has_time()); // Afternoon second
     }
 }

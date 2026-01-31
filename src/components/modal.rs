@@ -140,7 +140,9 @@ impl HelpModal {
                 "Member Details",
                 vec![
                     ("n", "New 1-on-1 meeting"),
-                    ("Enter", "View meeting notes"),
+                    ("m", "Record mood observation"),
+                    ("Enter", "View entry notes"),
+                    ("Del", "Delete entry"),
                     ("Esc", "Back to party view"),
                 ],
             ),

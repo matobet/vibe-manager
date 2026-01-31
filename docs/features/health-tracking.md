@@ -1,5 +1,19 @@
 # Health/Mood Tracking Feature
 
+## Implementation Status
+
+| Requirement | Status | Notes |
+|-------------|--------|-------|
+| FR-1: Record Mood Observation | ✅ Implemented | F1-F5 keys in note viewer |
+| FR-2: Context Selection | 📋 Planned | Currently mood tied to meetings only |
+| FR-3: Optional Notes | ✅ Implemented | Mood stored in meeting frontmatter |
+| FR-4: Mood History View | ✅ Implemented | Visible in engineer detail view |
+| FR-5: Trend Visualization | ✅ Implemented | Rising/Stable/Falling indicators |
+| FR-6: Dashboard Alerts | ✅ Implemented | Urgency score includes mood factors |
+| Standalone Mood Entry | 📋 Planned | Currently requires meeting context |
+
+---
+
 ## Feature Overview
 
 Health/Mood Tracking provides a simple way to record observations about team members' wellbeing over time. The goal is to spot early warning signs before they become serious problems.
@@ -328,8 +342,8 @@ interface EngineerMoodComputed {
 
 ### Storage
 
-- Stored in IndexedDB `mood_entries` collection
-- Indexed by `engineerId` and `recordedAt` for efficient querying
+- Mood stored in YAML frontmatter of meeting files (`mood: 1-5`)
+- Each meeting can have one mood observation
 - No remote sync (local-only by design)
 
 ---

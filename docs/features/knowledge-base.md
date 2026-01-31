@@ -1,5 +1,19 @@
 # Knowledge Base Feature Specification
 
+## Implementation Status
+
+| Requirement | Status | Notes |
+|-------------|--------|-------|
+| FR-1: All Fields Optional | ✅ Implemented | Profile fields are optional |
+| FR-2: View Upcoming Important Dates | 📋 Planned | Dashboard widget not implemented |
+| FR-3: Work Anniversary Auto-Calculation | 📋 Planned | Start date tracked but anniversary not surfaced |
+| FR-4: Custom Recurring Dates | 📋 Planned | Not yet implemented |
+| FR-5: Free-Form Personal Notes | 📋 Planned | Profile markdown exists but limited UI |
+| Partner/Children Fields | ✅ Implemented | Stored in `_profile.md` frontmatter |
+| Birthday Field | 📋 Planned | Data model exists, UI not implemented |
+
+---
+
 ## Feature Overview
 
 The Knowledge Base is a core feature of Vibe Manager that enables engineering managers to build comprehensive profiles for each team member. It goes beyond basic employment information to capture the personal details that help managers form genuine, meaningful relationships with their direct reports.

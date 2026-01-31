@@ -1,5 +1,20 @@
 # Team Overview Dashboard - Feature Specification
 
+## Implementation Status
+
+| Requirement | Status | Notes |
+|-------------|--------|-------|
+| FR-401: View All Active Engineers | ✅ Implemented | Grid layout with horizontal scrolling |
+| FR-402: Visual Status Indicators | ✅ Implemented | Traffic light colors, kaomoji expressions |
+| FR-403: Sorting by Urgency Score | ✅ Implemented | Exact algorithm as documented |
+| FR-404: Filtering Options | 📋 Planned | Not yet implemented |
+| FR-405: Quick Actions from Dashboard | 📋 Planned | Navigation only; quick mood/note from dashboard planned |
+| FR-406: Weekly Summary View | 📋 Planned | Not yet implemented |
+| Help Modal | ✅ Implemented | Press `?` for keybinding reference |
+| Sleep Indicators | ✅ Implemented | Overdue engineers show `zzz` sleep kaomoji |
+
+---
+
 ## 1. Feature Overview
 
 The Team Overview Dashboard is the primary landing page for Vibe Manager, providing an **at-a-glance status view** of all direct reports. Designed for engineering managers with 2-10 engineers, the dashboard enables quick identification of who needs immediate attention without requiring navigation to individual profiles.
@@ -273,7 +288,7 @@ The primary display unit for each team member, styled as an RPG character card w
 - Mood 3: `•_•` (neutral)
 - Mood 2: `◦︵◦` (worried)
 - Mood 1: `x_x` (stressed)
-- Overdue: `-_-` with floating z's
+- Overdue (no meeting in 2+ frequencies): `-_- zzz` (sleeping/neglected)
 
 **Mood Trend Indicators:**
 - `▲` Green = improving
@@ -375,6 +390,27 @@ The primary display unit for each team member, styled as an RPG character card w
  ║  PARTY: 6 members │ MORALE: 72% │ ⚠ 2 need check-in     ║
  ╚═══════════════════════════════════════════════════════════╝
 ```
+
+### 5.6 Keyboard Navigation
+
+**Dashboard Keybindings:**
+| Key | Action |
+|-----|--------|
+| `h/←` | Move selection left |
+| `l/→` | Move selection right |
+| `j/↓` | Move selection down |
+| `k/↑` | Move selection up |
+| `Enter` | Open selected engineer detail |
+| `n` | Create new engineer |
+| `?` | Show help modal |
+| `q` | Quit application |
+
+**Help Modal:**
+Press `?` from the dashboard to display a help modal showing all available keybindings. The modal includes:
+- Navigation keys
+- Action keys
+- View-specific shortcuts
+- General application controls
 
 ---
 

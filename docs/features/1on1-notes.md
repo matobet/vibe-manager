@@ -1,5 +1,20 @@
 # 1-on-1 Notes Feature Specification
 
+## Implementation Status
+
+| Requirement | Status | Notes |
+|-------------|--------|-------|
+| FR-1: Free-Form Markdown Notes | ✅ Implemented | External editor handles full markdown |
+| FR-2: Notes Associated with Meetings | ✅ Implemented | One file per meeting (YYYY-MM-DD.md) |
+| FR-3: Notes History per Engineer | ✅ Implemented | Chronological list in detail view |
+| FR-4: Search Within Notes | 📋 Planned | Not yet implemented |
+| FR-5: Auto-Save Functionality | ✅ Implemented | Delegated to external editor |
+| FR-6: Action Item Tracking | 📋 Planned | Not yet implemented |
+| FR-7: Optional Templates | 📋 Planned | Not yet implemented |
+| Delete Meeting with Confirmation | ✅ Implemented | Del key with confirmation modal |
+
+---
+
 ## Feature Overview
 
 The 1-on-1 Notes feature provides a **free-form, markdown-native** note-taking experience for engineering managers during and after 1-on-1 meetings. It is designed to complement existing workflows (Obsidian, Notion) rather than replace them, giving managers full flexibility in how they structure and organize their notes.
@@ -156,9 +171,9 @@ Notes must save automatically without user intervention.
 - Conflict resolution not needed (single user, local storage)
 
 **Implementation Notes:**
-- Use IndexedDB for persistence
-- Debounce prevents excessive writes during typing
-- Last saved timestamp stored with note
+- Editing delegated to external editor ($EDITOR)
+- External editor handles saving directly to disk
+- File modification time serves as timestamp
 
 ### FR-6: Optional Action Item Tracking
 
@@ -257,7 +272,7 @@ How are you doing?
 All 1-on-1 notes are stored locally on the user's machine.
 
 **Implementation:**
-- Notes stored in IndexedDB within browser
+- Notes stored as plain markdown files in workspace folder
 - No data transmitted to external servers
 - No cloud sync functionality
 - No analytics or telemetry on note content
@@ -308,6 +323,7 @@ The primary interface for viewing notes. Editing is delegated to the user's exte
 | `F1-F5` | Set mood (1-5) |
 | `Esc` | Back to engineer view |
 | `q` | Quit application |
+| `Del` | Delete meeting (with confirmation) |
 
 **External Editor Delegation:**
 - Follows UNIX philosophy: delegate editing to purpose-built tools
@@ -402,7 +418,7 @@ For search and filtering:
 - Average note size: ~2-5KB of markdown text
 - For 10 engineers with weekly 1-on-1s over 2 years: ~1000 notes
 - Estimated storage: ~5MB total
-- IndexedDB more than sufficient for this scale
+- Filesystem storage more than sufficient for this scale
 
 ---
 
@@ -410,7 +426,7 @@ For search and filtering:
 
 ### Principle
 
-Notes are stored as plain markdown text in IndexedDB. This approach means:
+Notes are stored as plain markdown files in the workspace folder. This approach means:
 - Notes are human-readable in their stored form
 - No transformation or export process needed
 - Content is inherently portable
@@ -473,10 +489,10 @@ The TUI delegates text editing to external editors following the UNIX philosophy
 
 ### Search Implementation
 
-Options for full-text search:
-- IndexedDB with manual indexing
-- MiniSearch or Lunr.js for client-side search
-- Simple string matching for MVP
+Options for full-text search (planned):
+- Rust-based text search (e.g., tantivy)
+- Simple string matching with grep-like semantics
+- In-memory indexing for fast queries
 
 ### Performance Considerations
 

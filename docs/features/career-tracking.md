@@ -1,5 +1,20 @@
 # Career Tracking Feature Specification
 
+## Implementation Status
+
+| Requirement | Status | Notes |
+|-------------|--------|-------|
+| 4.1: Set Current Career Level | ✅ Implemented | P1-P5 level in profile (`level` field) |
+| 4.2: Track Skill Proficiency | 📋 Planned | Data model exists (`skills` array) |
+| 4.3: Update Assessments with Evidence | 📋 Planned | Not yet implemented |
+| 4.4: View Progress Over Time | 📋 Planned | Not yet implemented |
+| 4.5: Set Development Goals | 📋 Planned | Not yet implemented |
+| 4.6: Time in Level Tracking | 📋 Planned | Start date exists, UI not implemented |
+| Level Badge Display | ✅ Implemented | P1-P5 shown in dashboard cards |
+| Skill Matrix UI | 📋 Planned | Full character sheet view not implemented |
+
+---
+
 ## 1. Feature Overview
 
 Career Tracking enables engineering managers to monitor and support the professional development of their direct reports. The feature provides a structured way to track where each engineer stands on the R&D Career Path, assess proficiency across key skills, and identify growth opportunities.

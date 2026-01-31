@@ -485,7 +485,7 @@ For initial release, focus on:
 
 ### Technical Considerations
 
-- All date calculations client-side (local-first architecture)
+- All date calculations at runtime (local-first architecture)
 - Computed properties recalculate on data change
-- IndexedDB for meeting storage
+- Markdown files in workspace folder for meeting storage
 - Dashboard queries should be efficient for 10 engineers

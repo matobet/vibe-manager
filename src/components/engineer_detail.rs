@@ -2,13 +2,13 @@
 
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table, TableState},
     Frame,
 };
 
-use crate::model::{Engineer, EngineerSummary, JournalEntry};
+use crate::model::{Engineer, EngineerSummary, JournalEntry, MoodTrend};
 use crate::theme::{
     format_days_ago, format_meeting_frequency, mood_color, mood_gauge, mood_gauge_with_value,
     mood_trend_icon, overdue_color, rpg_block, simple_block, sprites, style_header, style_muted,
@@ -197,12 +197,17 @@ impl<'a> EngineerDetail<'a> {
         if let Some(mood) = self.summary.recent_mood {
             let mood_display = mood_gauge_with_value(mood);
             let trend_icon = mood_trend_icon(self.summary.mood_trend);
+            let trend_style = match self.summary.mood_trend {
+                Some(MoodTrend::Rising) => Style::default().fg(Color::Green).bold(),
+                Some(MoodTrend::Falling) => Style::default().fg(Color::Rgb(255, 140, 0)).bold(),
+                _ => Style::default(),
+            };
             rows.push(Row::new(vec![
                 Cell::from("Morale"),
                 Cell::from(Line::from(vec![
                     Span::styled(mood_display, Style::default().fg(mood_color(mood))),
                     Span::raw(" "),
-                    Span::styled(trend_icon, Style::default().fg(mood_color(mood))),
+                    Span::styled(trend_icon, trend_style),
                 ])),
             ]));
         }

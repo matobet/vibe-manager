@@ -259,7 +259,7 @@ Visual timeline styled as character health log.
 ║          └─────────────────────────────────────────────────   ║
 ║            Jan 1                              Jan 30          ║
 ║                                                               ║
-║  TREND: ↓ Declining (-0.8 over 30 days)  ⚠ Needs attention  ║
+║  TREND: ↘ Declining (-0.8 over 30 days)  ⚠ Needs attention  ║
 ╚═══════════════════════════════════════════════════════════════╝
 ```
 

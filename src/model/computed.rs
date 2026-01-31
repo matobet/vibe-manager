@@ -30,9 +30,9 @@ pub enum MoodTrend {
 impl MoodTrend {
     pub fn as_str(&self) -> &'static str {
         match self {
-            MoodTrend::Rising => "↑",
-            MoodTrend::Stable => "→",
-            MoodTrend::Falling => "↓",
+            MoodTrend::Rising => "↗",
+            MoodTrend::Falling => "↘",
+            MoodTrend::Stable => " ",
         }
     }
 }

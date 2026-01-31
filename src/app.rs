@@ -701,84 +701,119 @@ impl App {
 
 /// Map keyboard event to message
 pub fn handle_key_event(app: &App, key: KeyEvent) -> Option<Msg> {
-    // Global shortcuts
+    // Helper to get lowercase char from key code (for case-insensitive matching)
+    let lowercase_char = match key.code {
+        KeyCode::Char(c) => Some(c.to_ascii_lowercase()),
+        _ => None,
+    };
+
+    // Global shortcuts (Ctrl+key)
     if key.modifiers.contains(KeyModifiers::CONTROL) {
-        match key.code {
-            KeyCode::Char('c') | KeyCode::Char('q') => return Some(Msg::Quit),
-            KeyCode::Char('r') => return Some(Msg::RefreshData),
+        match lowercase_char {
+            Some('c') | Some('q') => return Some(Msg::Quit),
+            Some('r') => return Some(Msg::RefreshData),
             _ => {}
         }
     }
 
     match app.view_mode {
         ViewMode::Dashboard => match key.code {
-            KeyCode::Char('q') => Some(Msg::Quit),
-            // Grid navigation: h/l for horizontal, j/k for moving through party
-            KeyCode::Char('h') | KeyCode::Left => Some(Msg::SelectPrev),
-            KeyCode::Char('l') | KeyCode::Right => Some(Msg::SelectNext),
-            KeyCode::Char('j') | KeyCode::Down => Some(Msg::SelectNext),
-            KeyCode::Char('k') | KeyCode::Up => Some(Msg::SelectPrev),
+            // Arrow keys
+            KeyCode::Left => Some(Msg::SelectPrev),
+            KeyCode::Right => Some(Msg::SelectNext),
+            KeyCode::Down => Some(Msg::SelectNext),
+            KeyCode::Up => Some(Msg::SelectPrev),
+            KeyCode::Enter => Some(Msg::ViewEngineer),
+            // Character keys (case-insensitive, except g/G)
             KeyCode::Char('g') => Some(Msg::SelectFirst),
             KeyCode::Char('G') => Some(Msg::SelectLast),
-            KeyCode::Enter | KeyCode::Char(' ') => Some(Msg::ViewEngineer),
-            KeyCode::Char('n') => Some(Msg::ShowNewEngineer),
-            KeyCode::Char('?') => Some(Msg::ShowHelp),
-            KeyCode::Char('r') => Some(Msg::RefreshData),
+            KeyCode::Char(c) => match c.to_ascii_lowercase() {
+                'q' => Some(Msg::Quit),
+                'h' => Some(Msg::SelectPrev),
+                'l' => Some(Msg::SelectNext),
+                'j' => Some(Msg::SelectNext),
+                'k' => Some(Msg::SelectPrev),
+                ' ' => Some(Msg::ViewEngineer),
+                'n' => Some(Msg::ShowNewEngineer),
+                '?' => Some(Msg::ShowHelp),
+                'r' => Some(Msg::RefreshData),
+                _ => None,
+            },
             _ => None,
         },
 
         ViewMode::EngineerDetail => match key.code {
-            KeyCode::Char('q') => Some(Msg::Quit),
-            KeyCode::Esc | KeyCode::Backspace | KeyCode::Char('h') | KeyCode::Left => {
-                Some(Msg::Back)
-            }
-            KeyCode::Char('j') | KeyCode::Down => Some(Msg::SelectNext),
-            KeyCode::Char('k') | KeyCode::Up => Some(Msg::SelectPrev),
-            KeyCode::Char('g') => Some(Msg::SelectFirst),
-            KeyCode::Char('G') => Some(Msg::SelectLast),
-            KeyCode::Enter | KeyCode::Char('l') | KeyCode::Right => {
+            // Non-char keys
+            KeyCode::Esc | KeyCode::Backspace => Some(Msg::Back),
+            KeyCode::Left => Some(Msg::Back),
+            KeyCode::Down => Some(Msg::SelectNext),
+            KeyCode::Up => Some(Msg::SelectPrev),
+            KeyCode::Right | KeyCode::Enter => {
                 if app.selected_index < app.selected_meeting_count() {
                     Some(Msg::ViewMeeting(app.selected_index))
                 } else {
                     None
                 }
             }
-            KeyCode::Char('e') => {
-                if app.selected_index < app.selected_meeting_count() {
-                    Some(Msg::EditMeetingFromList(app.selected_index))
-                } else {
-                    None
-                }
-            }
-            KeyCode::Char('n') => Some(Msg::NewMeeting),
-            KeyCode::Char('m') => Some(Msg::ShowEntryInput),
             KeyCode::Delete => Some(Msg::ShowDeleteConfirm),
-            KeyCode::Char('?') => Some(Msg::ShowHelp),
+            // Character keys (case-insensitive, except g/G)
+            KeyCode::Char('g') => Some(Msg::SelectFirst),
+            KeyCode::Char('G') => Some(Msg::SelectLast),
+            KeyCode::Char(c) => match c.to_ascii_lowercase() {
+                'q' => Some(Msg::Quit),
+                'h' => Some(Msg::Back),
+                'j' => Some(Msg::SelectNext),
+                'k' => Some(Msg::SelectPrev),
+                'l' => {
+                    if app.selected_index < app.selected_meeting_count() {
+                        Some(Msg::ViewMeeting(app.selected_index))
+                    } else {
+                        None
+                    }
+                }
+                'e' => {
+                    if app.selected_index < app.selected_meeting_count() {
+                        Some(Msg::EditMeetingFromList(app.selected_index))
+                    } else {
+                        None
+                    }
+                }
+                'n' => Some(Msg::NewMeeting),
+                'm' => Some(Msg::ShowEntryInput),
+                '?' => Some(Msg::ShowHelp),
+                _ => None,
+            },
             _ => None,
         },
 
         ViewMode::NoteViewer => match key.code {
             KeyCode::Esc | KeyCode::Backspace => Some(Msg::Back),
-            KeyCode::Char('q') => Some(Msg::Quit),
-            // Edit with external editor
-            KeyCode::Char('e') => Some(Msg::EditMeeting),
-            // Delete meeting
             KeyCode::Delete => Some(Msg::ShowDeleteConfirm),
-            // Mood
             KeyCode::F(1) => Some(Msg::UpdateMood(1)),
             KeyCode::F(2) => Some(Msg::UpdateMood(2)),
             KeyCode::F(3) => Some(Msg::UpdateMood(3)),
             KeyCode::F(4) => Some(Msg::UpdateMood(4)),
             KeyCode::F(5) => Some(Msg::UpdateMood(5)),
+            KeyCode::Char(c) => match c.to_ascii_lowercase() {
+                'q' => Some(Msg::Quit),
+                'e' => Some(Msg::EditMeeting),
+                _ => None,
+            },
             _ => None,
         },
 
         ViewMode::DeleteConfirmModal => match key.code {
-            KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => Some(Msg::ConfirmDelete),
-            KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => Some(Msg::CancelModal),
+            KeyCode::Enter => Some(Msg::ConfirmDelete),
+            KeyCode::Esc => Some(Msg::CancelModal),
+            KeyCode::Char(c) => match c.to_ascii_lowercase() {
+                'y' => Some(Msg::ConfirmDelete),
+                'n' => Some(Msg::CancelModal),
+                _ => None,
+            },
             _ => None,
         },
 
+        // Modals that accept text input preserve case
         ViewMode::NewEngineerModal => match key.code {
             KeyCode::Esc => Some(Msg::CancelModal),
             KeyCode::Char(c) => Some(Msg::Input(c)),
@@ -802,7 +837,11 @@ pub fn handle_key_event(app: &App, key: KeyEvent) -> Option<Msg> {
         },
 
         ViewMode::Help => match key.code {
-            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('?') => Some(Msg::HideHelp),
+            KeyCode::Esc => Some(Msg::HideHelp),
+            KeyCode::Char(c) => match c.to_ascii_lowercase() {
+                'q' | '?' => Some(Msg::HideHelp),
+                _ => None,
+            },
             _ => None,
         },
     }

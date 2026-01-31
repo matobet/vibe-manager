@@ -169,9 +169,8 @@ pub const ICON_WARNING: &str = "⚠"; // Warning triangle
 pub const ICON_DANGER: &str = "✗"; // X mark
 pub const ICON_HEART: &str = "♥";
 pub const ICON_EMPTY_HEART: &str = "♡";
-pub const ICON_UP: &str = "▲"; // Filled triangle - more visible than ↑
-pub const ICON_DOWN: &str = "▼"; // Filled triangle - more visible than ↓
-pub const ICON_STABLE: &str = "◆"; // Diamond for stable (distinct shape)
+pub const ICON_UP: &str = "↗";
+pub const ICON_DOWN: &str = "↘";
 pub const ICON_ACTIVE: &str = "●";
 pub const ICON_INACTIVE: &str = "○";
 pub const ICON_MEETING: &str = "☰"; // Menu/list icon (more compatible than 📅)
@@ -206,15 +205,12 @@ pub fn active_icon(is_active: bool) -> &'static str {
     }
 }
 
-/// Mood trend with distinct shapes (not just arrows)
-// TODO: Consider changing from triangles (▲▼◆) to arrows (↑↓→) for better readability
-//       across different fonts and terminal emulators. Arrows are also more intuitive.
+/// Mood trend indicator (only shows rising/falling, stable is hidden)
 pub fn mood_trend_icon(trend: Option<crate::model::MoodTrend>) -> &'static str {
     match trend {
-        Some(crate::model::MoodTrend::Rising) => ICON_UP, // ▲
-        Some(crate::model::MoodTrend::Falling) => ICON_DOWN, // ▼
-        Some(crate::model::MoodTrend::Stable) => ICON_STABLE, // ◆
-        None => " ",
+        Some(crate::model::MoodTrend::Rising) => ICON_UP,
+        Some(crate::model::MoodTrend::Falling) => ICON_DOWN,
+        Some(crate::model::MoodTrend::Stable) | None => " ",
     }
 }
 

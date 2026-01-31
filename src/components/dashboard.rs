@@ -11,8 +11,7 @@ use ratatui::{
 use crate::model::{EngineerSummary, WorkspaceSummary};
 use crate::theme::{
     mood_gauge, rpg_block, simple_block, style_header, style_muted, style_success, style_title,
-    style_warning, COLOR_PRIMARY, COLOR_SECONDARY, COLOR_SUCCESS, ICON_HEART, ICON_PERSON,
-    ICON_WARNING,
+    style_warning, COLOR_PRIMARY, COLOR_SECONDARY, COLOR_SUCCESS, ICON_HEART, ICON_WARNING,
 };
 
 use super::AvatarGrid;
@@ -75,33 +74,8 @@ impl<'a> Dashboard<'a> {
     fn render_stats(&self, frame: &mut Frame, area: Rect) {
         let stats_chunks = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Percentage(33),
-                Constraint::Percentage(33),
-                Constraint::Percentage(34),
-            ])
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(area);
-
-        // Team size
-        let team_text = vec![
-            Line::from(vec![
-                Span::styled(
-                    format!("{} ", ICON_PERSON),
-                    Style::default().fg(COLOR_PRIMARY),
-                ),
-                Span::styled(
-                    format!("{}", self.workspace_summary.active_count),
-                    style_header(),
-                ),
-                Span::styled(
-                    format!(" / {}", self.workspace_summary.team_size),
-                    style_muted(),
-                ),
-            ]),
-            Line::from(Span::styled("party members", style_muted())),
-        ];
-        let team_para = Paragraph::new(team_text).block(simple_block("Party"));
-        frame.render_widget(team_para, stats_chunks[0]);
 
         // Overdue count
         let overdue_style = if self.workspace_summary.overdue_count > 0 {
@@ -130,7 +104,7 @@ impl<'a> Dashboard<'a> {
             Line::from(Span::styled("need attention", style_muted())),
         ];
         let overdue_para = Paragraph::new(overdue_text).block(simple_block("Quests"));
-        frame.render_widget(overdue_para, stats_chunks[1]);
+        frame.render_widget(overdue_para, stats_chunks[0]);
 
         // Average mood
         let mood_text = match self.workspace_summary.average_mood {
@@ -155,7 +129,7 @@ impl<'a> Dashboard<'a> {
             }
         };
         let mood_para = Paragraph::new(mood_text).block(simple_block("Morale"));
-        frame.render_widget(mood_para, stats_chunks[2]);
+        frame.render_widget(mood_para, stats_chunks[1]);
     }
 
     fn render_party(&self, frame: &mut Frame, area: Rect) {

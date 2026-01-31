@@ -92,10 +92,10 @@ These elements are **immediately visible** without any interaction:
 #### Health/Mood Trends
 | Status | Visual | Meaning |
 |--------|--------|---------|
-| Declining | Red down arrow | Mood dropped significantly (configurable threshold) |
+| Declining | Orange diagonal arrow (↘) | Mood dropped significantly |
 | Needs Attention | Yellow alert | Low current mood (1-2) or volatility |
-| Stable | No indicator | Within normal range |
-| Improving | Green up arrow | Consistent improvement |
+| Stable | No indicator | Within normal range (hidden for cleaner display) |
+| Improving | Green diagonal arrow (↗) | Consistent improvement |
 
 **Display Information:**
 - Current mood score (most recent)
@@ -271,7 +271,7 @@ The primary display unit for each team member, styled as an RPG character card w
  │  ║ ◕‿◕ ║  │        ║  ║ ^‿^ ║  ║
  │  ╚═════╝  │        ║  ╚═════╝  ║
  │ Alex Chen │        ║Jordan Lee ║
- │  ♥♥♥♡♡    │        ║ ▲ ♥♥♥♥♡  ║
+ │  ♥♥♥♡♡    │        ║ ↗ ♥♥♥♥♡  ║
  │ ✓ 3d ago  │        ║ ✓ today   ║
  ╰───────────╯        ╚═══════════╝
 ```
@@ -291,9 +291,8 @@ The primary display unit for each team member, styled as an RPG character card w
 - Overdue (no meeting in 2+ frequencies): `-_- zzz` (sleeping/neglected)
 
 **Mood Trend Indicators:**
-- `▲` Green = improving
-- `◆` Gray = stable
-- `▼` Red = declining
+- `↗` Green = improving
+- `↘` Orange = declining (hidden when stable for cleaner display)
 
 **Card Layout - RPG Character Card Style (Alternative):**
 ```
@@ -342,10 +341,10 @@ The primary display unit for each team member, styled as an RPG character card w
 
 **Mood Status Badge:**
 ```
- ▲ ♥♥♥♥♡             ← Trend arrow (colored) + heart gauge
-   ▲ Green = improving
-   ◆ Gray = stable
-   ▼ Red = declining
+ ↗ ♥♥♥♥♡             ← Trend arrow (colored) + heart gauge
+   ↗ Green = improving
+   ↘ Orange = declining
+   (no indicator when stable)
 ```
 
 ### 5.3 Quick Action Buttons

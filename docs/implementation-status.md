@@ -104,10 +104,13 @@ Quick reference for what's implemented vs planned in Vibe Manager.
 
 ## Keyboard Shortcuts (Implemented)
 
+**Note:** All single-key shortcuts are case-insensitive (e.g., `Q` and `q` both quit), except `g` (first) and `G` (last) which are intentionally different.
+
 ### Dashboard
 | Key | Action |
 |-----|--------|
 | `h/j/k/l` or arrows | Navigate grid |
+| `g` / `G` | Jump to first / last |
 | `Enter` | Open engineer detail |
 | `n` | New engineer |
 | `?` | Help modal |

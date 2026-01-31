@@ -8,7 +8,7 @@
 
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Paragraph},
     Frame,
@@ -98,8 +98,8 @@ impl<'a> AvatarCard<'a> {
             .recent_mood
             .map_or(style_muted(), |m| Style::default().fg(mood_color(m)));
         let trend_style = match self.summary.mood_trend {
-            Some(MoodTrend::Rising) => Style::default().fg(Color::Green),
-            Some(MoodTrend::Falling) => Style::default().fg(Color::Red),
+            Some(MoodTrend::Rising) => Style::default().fg(Color::Green).bold(),
+            Some(MoodTrend::Falling) => Style::default().fg(Color::Rgb(255, 140, 0)).bold(),
             _ => style_muted(),
         };
         let mood_spans = if trend_icon.trim().is_empty() {

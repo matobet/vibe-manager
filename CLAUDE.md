@@ -63,3 +63,17 @@ Integration tests use fixtures in `tests/fixtures/` containing sample team data.
 cargo test                            # Run all tests
 cargo test storage                    # Run storage tests only
 ```
+
+## Documentation Maintenance
+
+The `docs/` folder contains product specifications written before/during development. Keep these in sync with implementation:
+
+- **docs/implementation-status.md** - Quick reference of what's implemented vs planned. Update this when completing features.
+- **docs/features/*.md** - Each has an "Implementation Status" table at the top. Update status when implementing requirements.
+- **docs/roadmap.md** - Phase status and feature tables. Mark features as done when complete.
+
+When implementing a feature:
+1. Check the relevant feature spec in `docs/features/` for requirements
+2. After implementation, update the Implementation Status table in that doc
+3. Update `docs/implementation-status.md` summary
+4. If completing a roadmap item, update `docs/roadmap.md`

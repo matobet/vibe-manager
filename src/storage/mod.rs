@@ -3,11 +3,18 @@ pub mod profile;
 pub mod workspace;
 
 pub use meeting::*;
-pub use profile::*;
 pub use workspace::*;
 
 // Re-export journal entry functions with clearer names
 pub use meeting::{create_entry, load_entries, save_entry, update_entry_mood};
+
+// Re-export report functions
+pub use profile::{
+    archive_report, create_report, load_report, load_report_with_manager, save_report,
+};
+
+// Re-export workspace functions
+pub use workspace::{has_team_dir, list_report_dirs, list_team_member_dirs};
 
 use thiserror::Error;
 

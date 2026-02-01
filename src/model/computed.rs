@@ -1,11 +1,11 @@
 use chrono::Local;
 use ratatui::style::Color;
 
-use super::{Engineer, JournalEntry};
-use crate::utils::engineer_color;
+use super::{JournalEntry, Report, ReportType};
+use crate::utils::report_color;
 
 #[derive(Debug, Clone)]
-pub struct EngineerSummary {
+pub struct ReportSummary {
     pub name: String,
     pub level: String,
     pub meeting_frequency: String,
@@ -14,10 +14,29 @@ pub struct EngineerSummary {
     pub is_overdue: bool,
     pub mood_trend: Option<MoodTrend>,
     pub recent_mood: Option<u8>,
-    /// Display color for the engineer (derived from name hash or explicit color)
+    /// Display color for the report (derived from name hash or explicit color)
     pub color: Color,
     /// Urgency score for sorting (higher = needs more attention)
     pub urgency_score: i32,
+    /// Report type (IC or Manager)
+    pub report_type: ReportType,
+    /// For managers: team metrics
+    pub team_metrics: Option<TeamMetrics>,
+}
+
+/// Team metrics computed for managers
+#[derive(Debug, Clone)]
+pub struct TeamMetrics {
+    /// Number of 2nd-level reports
+    pub team_size: usize,
+    /// Average mood across the team
+    pub team_average_mood: Option<f32>,
+    /// Team mood trend direction
+    pub team_mood_trend: Option<MoodTrend>,
+    /// Number of team members overdue for meetings
+    pub team_overdue_count: usize,
+    /// Composite team health score (0-100)
+    pub team_health_score: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,11 +56,11 @@ impl MoodTrend {
     }
 }
 
-pub fn compute_engineer_summary(
-    engineer: &Engineer,
+pub fn compute_report_summary(
+    report: &Report,
     entries: &[JournalEntry],
     overdue_threshold: u32,
-) -> EngineerSummary {
+) -> ReportSummary {
     let today = Local::now().date_naive();
 
     // For overdue calculation, only count "meetings" (entries with content)
@@ -54,7 +73,7 @@ pub fn compute_engineer_summary(
     let days_since_meeting = last_meeting_date.map(|d| (today - d).num_days());
 
     // Calculate if overdue
-    let frequency_days = engineer.meeting_frequency_days() as i64;
+    let frequency_days = report.meeting_frequency_days() as i64;
     let is_overdue = days_since_meeting
         .map(|days| days > frequency_days + overdue_threshold as i64)
         .unwrap_or(true); // No meetings = overdue
@@ -70,7 +89,7 @@ pub fn compute_engineer_summary(
     let recent_mood = recent_moods.first().copied();
     let mood_trend = calculate_mood_trend(&recent_moods);
 
-    let color = engineer_color(engineer.profile.color.as_deref(), &engineer.profile.name);
+    let color = report_color(report.profile.color.as_deref(), &report.profile.name);
 
     let urgency_score = calculate_urgency_score(
         days_since_meeting,
@@ -80,25 +99,132 @@ pub fn compute_engineer_summary(
         mood_trend,
     );
 
-    EngineerSummary {
-        name: engineer.profile.name.clone(),
-        level: engineer
+    ReportSummary {
+        name: report.profile.name.clone(),
+        level: report
             .profile
             .level
             .clone()
             .unwrap_or_else(|| "-".to_string()),
-        meeting_frequency: engineer.profile.meeting_frequency.clone(),
-        active: engineer.profile.active,
+        meeting_frequency: report.profile.meeting_frequency.clone(),
+        active: report.profile.active,
         days_since_meeting,
         is_overdue,
         mood_trend,
         recent_mood,
         color,
         urgency_score,
+        report_type: report.profile.report_type,
+        team_metrics: None, // Set separately for managers
     }
 }
 
-/// Calculate urgency score for sorting engineers by attention needed.
+/// Compute team metrics for a manager from their 2nd-level report summaries
+pub fn compute_team_metrics(team_summaries: &[ReportSummary]) -> TeamMetrics {
+    let team_size = team_summaries.len();
+    let active_summaries: Vec<_> = team_summaries.iter().filter(|s| s.active).collect();
+
+    // Team average mood
+    let moods: Vec<f32> = active_summaries
+        .iter()
+        .filter_map(|s| s.recent_mood)
+        .map(|m| m as f32)
+        .collect();
+
+    let team_average_mood = if moods.is_empty() {
+        None
+    } else {
+        Some(moods.iter().sum::<f32>() / moods.len() as f32)
+    };
+
+    // Team mood trend (aggregate from individual trends)
+    let team_mood_trend = aggregate_mood_trends(team_summaries);
+
+    // Count overdue
+    let team_overdue_count = active_summaries.iter().filter(|s| s.is_overdue).count();
+
+    // Calculate team health score (0-100)
+    let team_health_score = calculate_team_health_score(
+        team_size,
+        team_average_mood,
+        team_overdue_count,
+        team_summaries,
+    );
+
+    TeamMetrics {
+        team_size,
+        team_average_mood,
+        team_mood_trend,
+        team_overdue_count,
+        team_health_score,
+    }
+}
+
+/// Aggregate individual mood trends into a team trend
+fn aggregate_mood_trends(summaries: &[ReportSummary]) -> Option<MoodTrend> {
+    let mut rising = 0;
+    let mut falling = 0;
+
+    for summary in summaries.iter().filter(|s| s.active) {
+        match summary.mood_trend {
+            Some(MoodTrend::Rising) => rising += 1,
+            Some(MoodTrend::Falling) => falling += 1,
+            _ => {}
+        }
+    }
+
+    if rising > falling * 2 {
+        Some(MoodTrend::Rising)
+    } else if falling > rising * 2 {
+        Some(MoodTrend::Falling)
+    } else if rising > 0 || falling > 0 {
+        Some(MoodTrend::Stable)
+    } else {
+        None
+    }
+}
+
+/// Calculate a composite team health score (0-100)
+/// Higher = healthier team
+fn calculate_team_health_score(
+    team_size: usize,
+    avg_mood: Option<f32>,
+    overdue_count: usize,
+    summaries: &[ReportSummary],
+) -> u8 {
+    if team_size == 0 {
+        return 0;
+    }
+
+    let mut score: f32 = 100.0;
+
+    // Deduct for low average mood (max -30 points)
+    if let Some(mood) = avg_mood {
+        // mood is 1-5, ideal is 4+
+        let mood_penalty = (4.0 - mood).max(0.0) * 10.0;
+        score -= mood_penalty;
+    } else {
+        // No mood data - slight penalty
+        score -= 10.0;
+    }
+
+    // Deduct for overdue meetings (max -40 points)
+    let overdue_ratio = overdue_count as f32 / team_size as f32;
+    score -= overdue_ratio * 40.0;
+
+    // Deduct for falling moods (max -20 points)
+    let falling_count = summaries
+        .iter()
+        .filter(|s| s.active && s.mood_trend == Some(MoodTrend::Falling))
+        .count();
+    let falling_ratio = falling_count as f32 / team_size as f32;
+    score -= falling_ratio * 20.0;
+
+    // Ensure bounds
+    score.clamp(0.0, 100.0) as u8
+}
+
+/// Calculate urgency score for sorting reports by attention needed.
 /// Higher score = more urgent attention required.
 ///
 /// Scoring factors:
@@ -182,9 +308,11 @@ pub struct WorkspaceSummary {
     pub active_count: usize,
     pub overdue_count: usize,
     pub average_mood: Option<f32>,
+    /// Total count including 2nd-level reports
+    pub total_report_count: usize,
 }
 
-pub fn compute_workspace_summary(summaries: &[EngineerSummary]) -> WorkspaceSummary {
+pub fn compute_workspace_summary(summaries: &[ReportSummary]) -> WorkspaceSummary {
     let active_summaries: Vec<_> = summaries.iter().filter(|s| s.active).collect();
 
     let team_size = summaries.len();
@@ -208,7 +336,18 @@ pub fn compute_workspace_summary(summaries: &[EngineerSummary]) -> WorkspaceSumm
         active_count,
         overdue_count,
         average_mood,
+        total_report_count: team_size, // Will be updated to include 2nd-level reports
     }
+}
+
+/// Extended workspace summary including 2nd-level reports
+pub fn compute_extended_workspace_summary(
+    direct_summaries: &[ReportSummary],
+    second_level_count: usize,
+) -> WorkspaceSummary {
+    let mut summary = compute_workspace_summary(direct_summaries);
+    summary.total_report_count = direct_summaries.len() + second_level_count;
+    summary
 }
 
 #[cfg(test)]
@@ -273,5 +412,48 @@ mod tests {
         // 12 days since meeting, 14 day frequency = 2 days until due
         let score = calculate_urgency_score(Some(12), 14, 3, Some(3), Some(MoodTrend::Stable));
         assert_eq!(score, 5); // approaching due date
+    }
+
+    #[test]
+    fn test_team_health_score_healthy() {
+        let summaries = vec![
+            create_test_summary(Some(4), Some(MoodTrend::Stable), false),
+            create_test_summary(Some(5), Some(MoodTrend::Rising), false),
+            create_test_summary(Some(4), Some(MoodTrend::Stable), false),
+        ];
+        let metrics = compute_team_metrics(&summaries);
+        assert!(metrics.team_health_score >= 90);
+    }
+
+    #[test]
+    fn test_team_health_score_unhealthy() {
+        let summaries = vec![
+            create_test_summary(Some(2), Some(MoodTrend::Falling), true),
+            create_test_summary(Some(1), Some(MoodTrend::Falling), true),
+            create_test_summary(Some(3), Some(MoodTrend::Falling), true),
+        ];
+        let metrics = compute_team_metrics(&summaries);
+        assert!(metrics.team_health_score < 50);
+    }
+
+    fn create_test_summary(
+        mood: Option<u8>,
+        trend: Option<MoodTrend>,
+        overdue: bool,
+    ) -> ReportSummary {
+        ReportSummary {
+            name: "Test".to_string(),
+            level: "P3".to_string(),
+            meeting_frequency: "biweekly".to_string(),
+            active: true,
+            days_since_meeting: Some(7),
+            is_overdue: overdue,
+            mood_trend: trend,
+            recent_mood: mood,
+            color: Color::White,
+            urgency_score: 0,
+            report_type: ReportType::Individual,
+            team_metrics: None,
+        }
     }
 }

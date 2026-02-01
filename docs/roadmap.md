@@ -161,6 +161,35 @@ This roadmap outlines the phased development approach for Vibe Manager, from MVP
 
 ---
 
+## Managing Managers 🔄 IN PROGRESS
+
+**Focus**: Support managers as direct reports with visibility into their teams
+
+### Goals
+- Track 1-on-1s with manager reports
+- Visibility into 2nd-level reports (skip-levels)
+- Team health metrics for each manager
+
+### Features
+
+| Feature | Description | Priority | Status |
+|---------|-------------|----------|--------|
+| Report type (IC/Manager) | Distinguish between ICs and managers | P0 | ✅ Done |
+| M-track levels | M1-M5 career levels for managers | P0 | ✅ Done |
+| Nested team structure | team/ subdirectory for 2nd-level reports | P0 | ✅ Done |
+| Team metrics | Health score, average mood, overdue count | P0 | ✅ Done |
+| Default 2nd-level frequency | Workspace setting for skip-level cadence | P0 | ✅ Done |
+| Manager dashboard cards | Team health bar, expand/collapse | P0 | 📋 Planned |
+| Manager detail view | Team roster with navigation | P0 | 📋 Planned |
+| Skip-level tracking | Alerts for overdue skip-levels | P1 | 📋 Planned |
+
+### Success Criteria
+- Can see all managers and their teams at a glance
+- Team health visible on dashboard
+- Can navigate to and track skip-level meetings
+
+---
+
 ## Future Considerations
 
 These items are out of scope for initial phases but may be considered later:

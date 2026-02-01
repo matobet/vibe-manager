@@ -14,6 +14,13 @@ pub struct WorkspaceSettings {
     pub default_meeting_frequency: String,
     #[serde(default = "default_overdue_threshold")]
     pub overdue_threshold_days: u32,
+    /// Default meeting frequency for 2nd-level reports (skip-levels)
+    #[serde(default = "default_2nd_level_frequency")]
+    pub default_2nd_level_frequency: String,
+}
+
+fn default_2nd_level_frequency() -> String {
+    "monthly".to_string()
 }
 
 fn default_meeting_frequency() -> String {

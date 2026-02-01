@@ -1,7 +1,7 @@
-//! Engineer card components with color-coded borders and kaomoji avatars
+//! Report card components with color-coded borders and kaomoji avatars
 //!
 //! Design Philosophy:
-//! - Color-coded borders for quick engineer recognition
+//! - Color-coded borders for quick report recognition
 //! - Level badges (★ P3) with frame styles indicating level
 //! - Kaomoji faces showing mood and overdue status
 //! - Compact cards showing name, mood gauge, and meeting status
@@ -14,23 +14,23 @@ use ratatui::{
     Frame,
 };
 
-use crate::model::{EngineerSummary, MoodTrend};
+use crate::model::{MoodTrend, ReportSummary, ReportType};
 use crate::theme::{
     format_days_ago, mood_color, mood_gauge, mood_trend_icon, overdue_color, overdue_icon, sprites,
     style_muted, style_title, COLOR_SECONDARY,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ENGINEER CARD COMPONENT - For dashboard grid
+// REPORT CARD COMPONENT - For dashboard grid
 // ═══════════════════════════════════════════════════════════════════════════════
 
 pub struct AvatarCard<'a> {
-    summary: &'a EngineerSummary,
+    summary: &'a ReportSummary,
     is_selected: bool,
 }
 
 impl<'a> AvatarCard<'a> {
-    pub fn new(summary: &'a EngineerSummary, is_selected: bool) -> Self {
+    pub fn new(summary: &'a ReportSummary, is_selected: bool) -> Self {
         Self {
             summary,
             is_selected,
@@ -38,7 +38,7 @@ impl<'a> AvatarCard<'a> {
     }
 
     pub fn render(&self, frame: &mut Frame, area: Rect) {
-        // Card border styled with engineer's color (color-coded for quick recognition)
+        // Card border styled with report's color (color-coded for quick recognition)
         let block = if self.is_selected {
             Block::default()
                 .borders(Borders::ALL)
@@ -61,10 +61,11 @@ impl<'a> AvatarCard<'a> {
         frame.render_widget(block, area);
 
         // Vertical layout: face sprite, name, mood, status
+        // Sprite area is 4 lines for all (managers have 4-line sprites, ICs have 3 + 1 padding)
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3), // Face sprite (frame + face + frame bottom)
+                Constraint::Length(4), // Face sprite (4 lines, bottom-aligned)
                 Constraint::Length(1), // Name
                 Constraint::Length(1), // Mood gauge
                 Constraint::Length(1), // Meeting status
@@ -135,7 +136,14 @@ impl<'a> AvatarCard<'a> {
         };
 
         let sprite = sprites::FaceSprite::from_summary(self.summary, face_style);
-        let para = Paragraph::new(sprite.lines()).alignment(Alignment::Center);
+        let mut lines = sprite.lines();
+
+        // Add top padding for ICs (3-line sprites) to align at bottom with managers (4-line)
+        if self.summary.report_type != ReportType::Manager {
+            lines.insert(0, Line::from(""));
+        }
+
+        let para = Paragraph::new(lines).alignment(Alignment::Center);
         frame.render_widget(para, area);
     }
 }
@@ -145,12 +153,12 @@ impl<'a> AvatarCard<'a> {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 pub struct AvatarGrid<'a> {
-    summaries: &'a [EngineerSummary],
+    summaries: &'a [ReportSummary],
     selected: usize,
 }
 
 impl<'a> AvatarGrid<'a> {
-    pub fn new(summaries: &'a [EngineerSummary], selected: usize) -> Self {
+    pub fn new(summaries: &'a [ReportSummary], selected: usize) -> Self {
         Self {
             summaries,
             selected,
@@ -163,7 +171,9 @@ impl<'a> AvatarGrid<'a> {
         }
 
         let card_width: u16 = 18;
-        let card_height: u16 = 8; // Height with kaomoji face sprite
+        // Height: border(1) + sprite(3-4) + name(1) + mood(1) + status(1) + border(1)
+        // Use 9 to accommodate manager sprites (4 lines with headband)
+        let card_height: u16 = 9;
 
         let cards_per_row = (area.width / card_width).max(1) as usize;
         let num_rows = self.summaries.len().div_ceil(cards_per_row);

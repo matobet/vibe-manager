@@ -29,9 +29,9 @@ cargo run -- /path/to/team            # Run TUI on existing workspace
 
 ### Module Structure
 - `app.rs` - Application state, key handling, message dispatch
-- `model/` - Data structures (EngineerProfile, Meeting, Workspace)
+- `model/` - Data structures (Report, ReportProfile, JournalEntry, Workspace)
 - `storage/` - File I/O, YAML frontmatter parsing, workspace loading
-- `components/` - Reusable UI widgets (avatar, dashboard, note_editor, modal)
+- `components/` - Reusable UI widgets (avatar, dashboard, report_detail, modal)
 - `views/` - Full-screen layouts (dashboard_view, detail_view)
 - `theme/rpg.rs` - 8-bit color palette and styling
 
@@ -40,20 +40,29 @@ cargo run -- /path/to/team            # Run TUI on existing workspace
 workspace/
 ├── .vibe-manager           # Workspace config (YAML)
 ├── alex-chen/
-│   ├── _profile.md         # Engineer profile (YAML frontmatter + markdown)
-│   ├── 2026-01-15.md       # Meeting note (date = filename, optional mood in frontmatter)
+│   ├── _profile.md         # Report profile (YAML frontmatter + markdown)
+│   ├── 2026-01-15.md       # Legacy meeting (supported at root)
+│   ├── journal/            # New journal entries
+│   │   └── 2026-01-15T143000.md  # Meeting or mood observation
+│   └── team/               # For managers: 2nd-level reports
+│       └── sam-taylor/
+│           ├── _profile.md # 2nd-level report
+│           └── journal/    # Skip-level meeting notes
 ```
 
-- Folders = engineers (slug derived from name)
-- Files = meetings (filename is date YYYY-MM-DD.md)
-- File exists = meeting happened (no status field needed)
-- Computed fields (overdue status, mood trends) calculated at runtime
+- Folders = reports (slug derived from name)
+- Files = meetings (filename is date YYYY-MM-DD.md or timestamp YYYY-MM-DDTHHMMSS.md)
+- Legacy entries at root level still supported, new entries in `journal/`
+- `team/` subdirectory = manager with 2nd-level reports
+- Computed fields (overdue status, mood trends, team metrics) calculated at runtime
 
 ### Key Types
-- `ViewMode` enum: Dashboard, EngineerDetail, NoteEditor, NewEngineerModal, Help
+- `ViewMode` enum: Dashboard, EngineerDetail, NoteViewer, NewEngineerModal, EntryInputModal, DeleteConfirmModal, Help
 - `Msg` enum: All state update messages
-- `EngineerProfile`: name, level (P1-P5), meeting_frequency, skills
-- `Meeting`: date, content, optional mood (1-5)
+- `Report`: slug, path, profile, notes_content, team (for managers)
+- `ReportProfile`: name, level (P1-P5 or M1-M5), report_type (ic/manager), meeting_frequency, skills
+- `ReportSummary`: computed metrics including team_metrics for managers
+- `JournalEntry`: timestamp, path, content, mood, context
 
 ## Testing
 

@@ -94,8 +94,8 @@ pub fn save_workspace(workspace: &Workspace) -> StorageResult<()> {
     Ok(())
 }
 
-/// List all engineer directories in workspace
-pub fn list_engineer_dirs(workspace: &Workspace) -> StorageResult<Vec<PathBuf>> {
+/// List all report directories in workspace (direct reports only)
+pub fn list_report_dirs(workspace: &Workspace) -> StorageResult<Vec<PathBuf>> {
     let mut dirs = Vec::new();
 
     for entry in fs::read_dir(&workspace.path)? {
@@ -118,6 +118,42 @@ pub fn list_engineer_dirs(workspace: &Workspace) -> StorageResult<Vec<PathBuf>> 
 
     dirs.sort();
     Ok(dirs)
+}
+
+/// List 2nd-level report directories under a manager's team/ folder
+pub fn list_team_member_dirs(manager_path: &Path) -> StorageResult<Vec<PathBuf>> {
+    let team_dir = manager_path.join("team");
+    let mut dirs = Vec::new();
+
+    if !team_dir.exists() {
+        return Ok(dirs);
+    }
+
+    for entry in fs::read_dir(&team_dir)? {
+        let path = entry?.path();
+
+        if path.is_dir() {
+            let name = path.file_name().and_then(|n| n.to_str());
+
+            // Skip hidden directories
+            if let Some(name) = name {
+                if !name.starts_with('.') {
+                    // Check if it has a _profile.md
+                    if path.join("_profile.md").exists() {
+                        dirs.push(path);
+                    }
+                }
+            }
+        }
+    }
+
+    dirs.sort();
+    Ok(dirs)
+}
+
+/// Check if a report directory has a team/ subdirectory (indicating a manager)
+pub fn has_team_dir(report_path: &Path) -> bool {
+    report_path.join("team").is_dir()
 }
 
 #[cfg(test)]

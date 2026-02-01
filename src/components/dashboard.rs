@@ -8,7 +8,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::model::{EngineerSummary, WorkspaceSummary};
+use crate::model::{ReportSummary, WorkspaceSummary};
 use crate::theme::{
     mood_gauge, rpg_block, simple_block, style_header, style_muted, style_success, style_title,
     style_warning, COLOR_PRIMARY, COLOR_SECONDARY, COLOR_SUCCESS, ICON_HEART, ICON_WARNING,
@@ -17,14 +17,14 @@ use crate::theme::{
 use super::AvatarGrid;
 
 pub struct Dashboard<'a> {
-    summaries: &'a [EngineerSummary],
+    summaries: &'a [ReportSummary],
     workspace_summary: &'a WorkspaceSummary,
     selected: usize,
 }
 
 impl<'a> Dashboard<'a> {
     pub fn new(
-        summaries: &'a [EngineerSummary],
+        summaries: &'a [ReportSummary],
         workspace_summary: &'a WorkspaceSummary,
         selected: usize,
     ) -> Self {
@@ -144,7 +144,7 @@ impl<'a> Dashboard<'a> {
     }
 }
 
-/// Render empty state when no engineers exist
+/// Render empty state when no reports exist
 pub fn render_empty_state(frame: &mut Frame, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)

@@ -6,7 +6,7 @@ use ratatui::{
 };
 
 use crate::app::{App, ViewMode};
-use crate::components::{render_empty_state, Dashboard, HelpModal, NewEngineerModal, StatusBar};
+use crate::components::{render_empty_state, Dashboard, HelpModal, NewReportModal, StatusBar};
 
 pub fn render_dashboard_view(app: &App, frame: &mut Frame) {
     let size = frame.area();
@@ -18,7 +18,7 @@ pub fn render_dashboard_view(app: &App, frame: &mut Frame) {
         .split(size);
 
     // Render main content
-    if app.engineers.is_empty() {
+    if app.reports.is_empty() {
         render_empty_state(frame, chunks[0]);
     } else {
         let dashboard = Dashboard::new(&app.summaries, &app.workspace_summary, app.selected_index);
@@ -27,7 +27,7 @@ pub fn render_dashboard_view(app: &App, frame: &mut Frame) {
 
     // Render status bar
     let context = format!(
-        "{} engineers • {} overdue",
+        "{} reports • {} overdue",
         app.workspace_summary.active_count, app.workspace_summary.overdue_count
     );
     let status = StatusBar::new(app.view_mode, &context, app.status_text());
@@ -38,8 +38,8 @@ pub fn render_dashboard_view(app: &App, frame: &mut Frame) {
         ViewMode::Help => {
             HelpModal::render(frame, size);
         }
-        ViewMode::NewEngineerModal => {
-            let modal = NewEngineerModal::new(&app.modal_fields, app.modal_field_index);
+        ViewMode::NewReportModal => {
+            let modal = NewReportModal::new(&app.new_report_state);
             modal.render(frame, size);
         }
         _ => {}

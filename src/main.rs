@@ -136,10 +136,10 @@ fn run_app(terminal: &mut app::Term, app: &mut App) -> Result<()> {
     loop {
         // Render
         terminal.draw(|frame| match app.view_mode {
-            ViewMode::Dashboard | ViewMode::Help | ViewMode::NewEngineerModal => {
+            ViewMode::Dashboard | ViewMode::Help | ViewMode::NewReportModal => {
                 render_dashboard_view(app, frame);
             }
-            ViewMode::EngineerDetail | ViewMode::EntryInputModal => {
+            ViewMode::ReportDetail | ViewMode::EntryInputModal => {
                 render_detail_view(app, frame);
             }
             ViewMode::NoteViewer => {
@@ -193,7 +193,7 @@ fn run_app(terminal: &mut app::Term, app: &mut App) -> Result<()> {
 /// file (whitespace only), the entry is canceled and the file is deleted.
 fn suspend_and_edit(terminal: &mut app::Term, app: &mut App, is_new: bool) -> Result<()> {
     // Get the entry file path
-    let (eng_idx, entry_idx) = match (app.selected_engineer_index, app.selected_entry_index) {
+    let (report_idx, entry_idx) = match (app.selected_report_index, app.selected_entry_index) {
         (Some(e), Some(m)) => (e, m),
         _ => {
             app.set_status("No entry selected");
@@ -201,7 +201,7 @@ fn suspend_and_edit(terminal: &mut app::Term, app: &mut App, is_new: bool) -> Re
         }
     };
 
-    let entry = &app.entries_by_engineer[eng_idx][entry_idx];
+    let entry = &app.entries_by_report[report_idx][entry_idx];
     let file_path = entry.path.clone();
 
     // Leave alternate screen and disable raw mode
@@ -238,9 +238,9 @@ fn suspend_and_edit(terminal: &mut app::Term, app: &mut App, is_new: bool) -> Re
             // Check if content is empty/whitespace only (user wants to cancel)
             if raw_content.trim().is_empty() || is_content_empty(&raw_content) {
                 // Delete the entry using shared helper
-                match app.delete_entry(eng_idx, entry_idx) {
+                match app.delete_entry(report_idx, entry_idx) {
                     Ok(()) => {
-                        app.view_mode = app::ViewMode::EngineerDetail;
+                        app.view_mode = app::ViewMode::ReportDetail;
                         app.set_status(if is_new {
                             "Entry creation canceled"
                         } else {
@@ -258,16 +258,17 @@ fn suspend_and_edit(terminal: &mut app::Term, app: &mut App, is_new: bool) -> Re
                 // Update frontmatter if present (user may have edited mood in file)
                 if let Some(yaml) = frontmatter_yaml {
                     if let Ok(fm) = serde_yaml::from_str(yaml) {
-                        app.entries_by_engineer[eng_idx][entry_idx].frontmatter = fm;
-                        app.editor_mood =
-                            app.entries_by_engineer[eng_idx][entry_idx].frontmatter.mood;
+                        app.entries_by_report[report_idx][entry_idx].frontmatter = fm;
+                        app.editor_mood = app.entries_by_report[report_idx][entry_idx]
+                            .frontmatter
+                            .mood;
                     }
                 }
 
                 // Update with body content only (without frontmatter)
                 let body_content = body.to_string();
                 app.editor_content = body_content.clone();
-                app.entries_by_engineer[eng_idx][entry_idx].content = body_content;
+                app.entries_by_report[report_idx][entry_idx].content = body_content;
                 app.set_status("Note updated");
             } else {
                 app.set_status("No changes");
@@ -276,8 +277,8 @@ fn suspend_and_edit(terminal: &mut app::Term, app: &mut App, is_new: bool) -> Re
         Err(e) => {
             // If editor failed on a new entry, clean up the file
             if is_new {
-                let _ = app.delete_entry(eng_idx, entry_idx);
-                app.view_mode = app::ViewMode::EngineerDetail;
+                let _ = app.delete_entry(report_idx, entry_idx);
+                app.view_mode = app::ViewMode::ReportDetail;
             }
             app.set_status(format!("Editor error: {}", e));
         }

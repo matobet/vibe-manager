@@ -8,11 +8,35 @@ use crate::model::{
     format_entry_filename, parse_entry_timestamp, Context, JournalEntry, JournalEntryFrontmatter,
 };
 
-/// Load all entries for an engineer
-pub fn load_entries(engineer_dir: &Path) -> StorageResult<Vec<JournalEntry>> {
+/// Load all entries for a report
+/// Supports both:
+/// - Legacy: entries at root level (report-slug/2026-01-15.md)
+/// - New: entries in journal/ subdirectory (report-slug/journal/2026-01-15.md)
+pub fn load_entries(report_dir: &Path) -> StorageResult<Vec<JournalEntry>> {
     let mut entries = Vec::new();
 
-    for dir_entry in fs::read_dir(engineer_dir)? {
+    // Load from root directory (legacy)
+    load_entries_from_dir(report_dir, &mut entries)?;
+
+    // Load from journal/ subdirectory (new structure)
+    let journal_dir = report_dir.join("journal");
+    if journal_dir.is_dir() {
+        load_entries_from_dir(&journal_dir, &mut entries)?;
+    }
+
+    // Sort by timestamp (oldest first)
+    entries.sort_by_key(|e| e.timestamp);
+
+    Ok(entries)
+}
+
+/// Load entries from a specific directory
+fn load_entries_from_dir(dir: &Path, entries: &mut Vec<JournalEntry>) -> StorageResult<()> {
+    if !dir.is_dir() {
+        return Ok(());
+    }
+
+    for dir_entry in fs::read_dir(dir)? {
         let path = dir_entry?.path();
 
         if !path.is_file() {
@@ -34,10 +58,7 @@ pub fn load_entries(engineer_dir: &Path) -> StorageResult<Vec<JournalEntry>> {
         }
     }
 
-    // Sort by timestamp (oldest first)
-    entries.sort_by_key(|e| e.timestamp);
-
-    Ok(entries)
+    Ok(())
 }
 
 /// Load a single entry
@@ -67,15 +88,20 @@ pub fn save_entry(entry: &JournalEntry) -> StorageResult<()> {
 }
 
 /// Create a new entry (mood observation or meeting)
+/// New entries are created in the journal/ subdirectory
 pub fn create_entry(
-    engineer_dir: &Path,
+    report_dir: &Path,
     mood: Option<u8>,
     context: Option<Context>,
     notes: String,
 ) -> StorageResult<JournalEntry> {
     let timestamp = Local::now().naive_local();
     let filename = format_entry_filename(timestamp);
-    let path = engineer_dir.join(&filename);
+
+    // Use journal/ subdirectory for new entries
+    let journal_dir = report_dir.join("journal");
+    fs::create_dir_all(&journal_dir)?;
+    let path = journal_dir.join(&filename);
 
     if path.exists() {
         return Err(StorageError::InvalidWorkspace(format!(
@@ -92,12 +118,14 @@ pub fn create_entry(
 }
 
 /// Create a new 1-on-1 meeting with template content
-pub fn create_meeting(engineer_dir: &Path, date: Option<NaiveDate>) -> StorageResult<JournalEntry> {
+/// New meetings are created in the journal/ subdirectory
+pub fn create_meeting(report_dir: &Path, date: Option<NaiveDate>) -> StorageResult<JournalEntry> {
     let timestamp = if let Some(d) = date {
-        // For explicit dates, check if there's already a legacy file
+        // For explicit dates, check if there's already a legacy file (at root or journal/)
         let legacy_filename = format!("{}.md", d.format("%Y-%m-%d"));
-        let legacy_path = engineer_dir.join(&legacy_filename);
-        if legacy_path.exists() {
+        let legacy_path = report_dir.join(&legacy_filename);
+        let journal_path = report_dir.join("journal").join(&legacy_filename);
+        if legacy_path.exists() || journal_path.exists() {
             return Err(StorageError::InvalidWorkspace(format!(
                 "Meeting already exists for {}",
                 d
@@ -109,6 +137,10 @@ pub fn create_meeting(engineer_dir: &Path, date: Option<NaiveDate>) -> StorageRe
         Local::now().naive_local()
     };
 
+    // Use journal/ subdirectory for new meetings
+    let journal_dir = report_dir.join("journal");
+    fs::create_dir_all(&journal_dir)?;
+
     // For new meetings, use timestamp-based filename
     let filename = if date.is_some() {
         // Legacy format for explicit dates
@@ -116,7 +148,7 @@ pub fn create_meeting(engineer_dir: &Path, date: Option<NaiveDate>) -> StorageRe
     } else {
         format_entry_filename(timestamp)
     };
-    let path = engineer_dir.join(&filename);
+    let path = journal_dir.join(&filename);
 
     if path.exists() {
         return Err(StorageError::InvalidWorkspace(format!(
@@ -154,9 +186,9 @@ pub fn update_entry_mood(entry: &mut JournalEntry, mood: u8) -> StorageResult<()
     save_entry(entry)
 }
 
-// Backwards compatibility aliases
-pub fn load_meetings(engineer_dir: &Path) -> StorageResult<Vec<JournalEntry>> {
-    load_entries(engineer_dir)
+// Backwards compatibility alias
+pub fn load_meetings(report_dir: &Path) -> StorageResult<Vec<JournalEntry>> {
+    load_entries(report_dir)
 }
 
 pub fn save_meeting(entry: &JournalEntry) -> StorageResult<()> {

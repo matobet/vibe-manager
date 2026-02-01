@@ -1,4 +1,4 @@
-//! Engineer detail view layout
+//! Report detail view layout
 
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -7,21 +7,21 @@ use ratatui::{
 
 use crate::app::{App, ViewMode};
 use crate::components::{
-    DeleteConfirmModal, EngineerDetail, EntryInputModal, HelpModal, NoteViewer, StatusBar,
+    DeleteConfirmModal, EntryInputModal, HelpModal, NoteViewer, ReportDetail, StatusBar,
 };
 
 pub fn render_detail_view(app: &App, frame: &mut Frame) {
     let size = frame.area();
 
-    // Get selected engineer data
-    let eng_idx = match app.selected_engineer_index {
+    // Get selected report data
+    let report_idx = match app.selected_report_index {
         Some(idx) => idx,
         None => return,
     };
 
-    let engineer = &app.engineers[eng_idx];
-    let summary = &app.summaries[eng_idx];
-    let entries = &app.entries_by_engineer[eng_idx];
+    let report = &app.reports[report_idx];
+    let summary = &app.summaries[report_idx];
+    let entries = &app.entries_by_report[report_idx];
 
     // Main layout
     let chunks = Layout::default()
@@ -29,13 +29,13 @@ pub fn render_detail_view(app: &App, frame: &mut Frame) {
         .constraints([Constraint::Min(10), Constraint::Length(1)])
         .split(size);
 
-    // Render engineer detail
-    let detail = EngineerDetail::new(engineer, summary, entries, app.selected_index);
+    // Render report detail
+    let detail = ReportDetail::new(report, summary, entries, app.selected_index);
     detail.render(frame, chunks[0]);
 
     // Render status bar
     let meeting_count = entries.iter().filter(|e| e.is_meeting()).count();
-    let context = format!("{} • {} meetings", engineer.profile.name, meeting_count);
+    let context = format!("{} • {} meetings", report.profile.name, meeting_count);
     let status = StatusBar::new(app.view_mode, &context, app.status_text());
     status.render(frame, chunks[1]);
 
@@ -68,7 +68,7 @@ pub fn render_viewer_view(app: &App, frame: &mut Frame) {
     let size = frame.area();
 
     // Get selected entry
-    let eng_idx = match app.selected_engineer_index {
+    let report_idx = match app.selected_report_index {
         Some(idx) => idx,
         None => return,
     };
@@ -77,8 +77,8 @@ pub fn render_viewer_view(app: &App, frame: &mut Frame) {
         None => return,
     };
 
-    let engineer = &app.engineers[eng_idx];
-    let entry = &app.entries_by_engineer[eng_idx][entry_idx];
+    let report = &app.reports[report_idx];
+    let entry = &app.entries_by_report[report_idx][entry_idx];
 
     // Main layout
     let chunks = Layout::default()
@@ -93,7 +93,7 @@ pub fn render_viewer_view(app: &App, frame: &mut Frame) {
     // Render status bar
     let context = format!(
         "{} • {}",
-        engineer.profile.name,
+        report.profile.name,
         entry.date().format("%Y-%m-%d")
     );
     let status = StatusBar::new(app.view_mode, &context, app.status_text());

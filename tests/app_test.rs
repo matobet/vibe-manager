@@ -42,9 +42,9 @@ mod tests {
         let path = fixtures_path();
         let app = vibe_manager::app::App::new(path).expect("Failed to load app");
 
-        assert!(!app.engineers.is_empty());
-        // Should load all engineers from fixtures
-        assert!(app.engineers.len() >= 2);
+        assert!(!app.reports.is_empty());
+        // Should load all reports from fixtures
+        assert!(app.reports.len() >= 2);
     }
 
     #[test]
@@ -54,29 +54,29 @@ mod tests {
         let mut app =
             vibe_manager::app::App::new(temp.path().to_path_buf()).expect("Failed to load app");
 
-        // Find the engineer and meeting indices
-        let eng_idx = app
-            .engineers
+        // Find the report and meeting indices
+        let report_idx = app
+            .reports
             .iter()
             .position(|e| e.profile.name == "Alex Chen")
             .expect("Alex Chen not found");
 
-        let initial_entry_count = app.entries_by_engineer[eng_idx].len();
+        let initial_entry_count = app.entries_by_report[report_idx].len();
         assert!(initial_entry_count > 0, "No entries to delete");
 
-        let entry_path = app.entries_by_engineer[eng_idx][0].path.clone();
+        let entry_path = app.entries_by_report[report_idx][0].path.clone();
         assert!(
             entry_path.exists(),
             "Entry file should exist before deletion"
         );
 
         // Delete the meeting
-        app.delete_entry(eng_idx, 0)
+        app.delete_entry(report_idx, 0)
             .expect("Failed to delete meeting");
 
         // Verify meeting was removed from memory
         assert_eq!(
-            app.entries_by_engineer[eng_idx].len(),
+            app.entries_by_report[report_idx].len(),
             initial_entry_count - 1
         );
 
@@ -91,16 +91,16 @@ mod tests {
         let mut app =
             vibe_manager::app::App::new(temp.path().to_path_buf()).expect("Failed to load app");
 
-        let eng_idx = app
-            .engineers
+        let report_idx = app
+            .reports
             .iter()
             .position(|e| e.profile.name == "Alex Chen")
             .expect("Alex Chen not found");
 
-        let initial_days_since = app.summaries[eng_idx].days_since_meeting;
+        let initial_days_since = app.summaries[report_idx].days_since_meeting;
 
         // Find the most recent meeting (entries with content, sorted oldest first)
-        let last_meeting_idx = app.entries_by_engineer[eng_idx]
+        let last_meeting_idx = app.entries_by_report[report_idx]
             .iter()
             .enumerate()
             .filter(|(_, e)| e.is_meeting())
@@ -108,14 +108,14 @@ mod tests {
             .last()
             .expect("No meetings found");
 
-        app.delete_entry(eng_idx, last_meeting_idx)
+        app.delete_entry(report_idx, last_meeting_idx)
             .expect("Failed to delete meeting");
 
         // Summary should be recomputed with new days_since_meeting
-        let new_days_since = app.summaries[eng_idx].days_since_meeting;
+        let new_days_since = app.summaries[report_idx].days_since_meeting;
 
         // Check if there are still meetings
-        let remaining_meetings = app.entries_by_engineer[eng_idx]
+        let remaining_meetings = app.entries_by_report[report_idx]
             .iter()
             .filter(|e| e.is_meeting())
             .count();
@@ -137,21 +137,21 @@ mod tests {
         let mut app =
             vibe_manager::app::App::new(temp.path().to_path_buf()).expect("Failed to load app");
 
-        let eng_idx = app
-            .engineers
+        let report_idx = app
+            .reports
             .iter()
             .position(|e| e.profile.name == "Alex Chen")
             .expect("Alex Chen not found");
 
         // Delete all entries one by one (always index 0 since list shrinks)
-        while !app.entries_by_engineer[eng_idx].is_empty() {
-            app.delete_entry(eng_idx, 0)
+        while !app.entries_by_report[report_idx].is_empty() {
+            app.delete_entry(report_idx, 0)
                 .expect("Failed to delete entry");
         }
 
-        assert!(app.entries_by_engineer[eng_idx].is_empty());
+        assert!(app.entries_by_report[report_idx].is_empty());
         // With no meetings, days_since_meeting should be None
-        assert!(app.summaries[eng_idx].days_since_meeting.is_none());
+        assert!(app.summaries[report_idx].days_since_meeting.is_none());
     }
 
     #[test]
@@ -178,17 +178,17 @@ mod tests {
         let mut app =
             vibe_manager::app::App::new(temp.path().to_path_buf()).expect("Failed to load app");
 
-        // Select an engineer first
-        let eng_idx = app
-            .engineers
+        // Select a report first
+        let report_idx = app
+            .reports
             .iter()
             .position(|e| e.profile.name == "Alex Chen")
             .expect("Alex Chen not found");
 
-        app.selected_engineer_index = Some(eng_idx);
-        app.view_mode = ViewMode::EngineerDetail;
+        app.selected_report_index = Some(report_idx);
+        app.view_mode = ViewMode::ReportDetail;
 
-        let initial_entry_count = app.entries_by_engineer[eng_idx].len();
+        let initial_entry_count = app.entries_by_report[report_idx].len();
 
         // Show entry input modal
         app.update(Msg::ShowEntryInput).unwrap();
@@ -211,14 +211,14 @@ mod tests {
 
         // Save entry
         app.update(Msg::SaveEntry).unwrap();
-        assert_eq!(app.view_mode, ViewMode::EngineerDetail);
+        assert_eq!(app.view_mode, ViewMode::ReportDetail);
         assert_eq!(
-            app.entries_by_engineer[eng_idx].len(),
+            app.entries_by_report[report_idx].len(),
             initial_entry_count + 1
         );
 
         // Verify the new entry
-        let new_entry = app.entries_by_engineer[eng_idx].last().unwrap();
+        let new_entry = app.entries_by_report[report_idx].last().unwrap();
         assert_eq!(new_entry.mood(), Some(4));
         assert_eq!(new_entry.frontmatter.context, Some(Context::Slack));
         assert_eq!(new_entry.content, "Hi");
@@ -233,15 +233,15 @@ mod tests {
         let mut app =
             vibe_manager::app::App::new(temp.path().to_path_buf()).expect("Failed to load app");
 
-        let eng_idx = app
-            .engineers
+        let report_idx = app
+            .reports
             .iter()
             .position(|e| e.profile.name == "Alex Chen")
             .expect("Alex Chen not found");
 
-        app.selected_engineer_index = Some(eng_idx);
-        app.view_mode = ViewMode::EngineerDetail;
-        let initial_count = app.entries_by_engineer[eng_idx].len();
+        app.selected_report_index = Some(report_idx);
+        app.view_mode = ViewMode::ReportDetail;
+        let initial_count = app.entries_by_report[report_idx].len();
 
         // Open modal and set some values
         app.update(Msg::ShowEntryInput).unwrap();
@@ -252,8 +252,8 @@ mod tests {
         app.update(Msg::CancelModal).unwrap();
 
         // Should be back to detail view with no new entry
-        assert_eq!(app.view_mode, ViewMode::EngineerDetail);
-        assert_eq!(app.entries_by_engineer[eng_idx].len(), initial_count);
+        assert_eq!(app.view_mode, ViewMode::ReportDetail);
+        assert_eq!(app.entries_by_report[report_idx].len(), initial_count);
         // State should be cleared
         assert_eq!(app.pending_entry_mood, None);
         assert!(app.pending_entry_notes.is_empty());
@@ -264,16 +264,16 @@ mod tests {
         let path = fixtures_path();
         let mut app = vibe_manager::app::App::new(path).expect("Failed to load app");
 
-        // Find engineer with mixed entries (meetings + mood observations)
-        let eng_idx = app
-            .engineers
+        // Find report with mixed entries (meetings + mood observations)
+        let report_idx = app
+            .reports
             .iter()
             .position(|e| e.profile.name == "Alex Chen")
             .expect("Alex Chen not found");
 
-        app.selected_engineer_index = Some(eng_idx);
+        app.selected_report_index = Some(report_idx);
 
-        let entries = &app.entries_by_engineer[eng_idx];
+        let entries = &app.entries_by_report[report_idx];
         let meeting_count = entries.iter().filter(|e| e.is_meeting()).count();
 
         // Display index 0 = most recent meeting (last meeting in array when reversed)
@@ -293,15 +293,15 @@ mod tests {
         let path = fixtures_path();
         let mut app = vibe_manager::app::App::new(path).expect("Failed to load app");
 
-        let eng_idx = app
-            .engineers
+        let report_idx = app
+            .reports
             .iter()
             .position(|e| e.profile.name == "Alex Chen")
             .expect("Alex Chen not found");
 
-        app.selected_engineer_index = Some(eng_idx);
+        app.selected_report_index = Some(report_idx);
 
-        let total_entries = app.entries_by_engineer[eng_idx].len();
+        let total_entries = app.entries_by_report[report_idx].len();
         let meeting_count = app.selected_meeting_count();
 
         // Should have more total entries than meetings (due to mood observations)

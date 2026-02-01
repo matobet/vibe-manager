@@ -4,8 +4,8 @@ pub use slug::*;
 
 use ratatui::style::Color;
 
-/// Color palette for engineer display colors - warm, friendly tones
-const ENGINEER_COLORS: &[Color] = &[
+/// Color palette for report display colors - warm, friendly tones
+const REPORT_COLORS: &[Color] = &[
     Color::Rgb(100, 149, 237), // Cornflower blue
     Color::Rgb(143, 188, 143), // Sage green
     Color::Rgb(205, 133, 63),  // Peru/terracotta
@@ -24,7 +24,7 @@ pub fn color_from_name(name: &str) -> Color {
     let hash: u32 = name
         .bytes()
         .fold(0, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u32));
-    ENGINEER_COLORS[(hash as usize) % ENGINEER_COLORS.len()]
+    REPORT_COLORS[(hash as usize) % REPORT_COLORS.len()]
 }
 
 /// Parse a hex color string like "#6495ED" into a Color
@@ -39,8 +39,8 @@ pub fn parse_hex_color(hex: &str) -> Option<Color> {
     Some(Color::Rgb(r, g, b))
 }
 
-/// Get display color for an engineer - uses explicit color if set, otherwise generates from name
-pub fn engineer_color(color: Option<&str>, name: &str) -> Color {
+/// Get display color for a report - uses explicit color if set, otherwise generates from name
+pub fn report_color(color: Option<&str>, name: &str) -> Color {
     color
         .and_then(parse_hex_color)
         .unwrap_or_else(|| color_from_name(name))

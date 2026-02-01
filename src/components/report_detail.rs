@@ -1,4 +1,4 @@
-//! Engineer detail view component
+//! Report detail view component
 
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -8,30 +8,29 @@ use ratatui::{
     Frame,
 };
 
-use crate::model::{Engineer, EngineerSummary, JournalEntry, MoodTrend};
+use crate::model::{JournalEntry, MoodTrend, Report, ReportSummary, ReportType};
 use crate::theme::{
     format_days_ago, format_meeting_frequency, mood_color, mood_gauge, mood_gauge_with_value,
     mood_trend_icon, overdue_color, rpg_block, simple_block, sprites, style_header, style_muted,
     style_title, COLOR_MUTED,
 };
 
-
-pub struct EngineerDetail<'a> {
-    engineer: &'a Engineer,
-    summary: &'a EngineerSummary,
+pub struct ReportDetail<'a> {
+    report: &'a Report,
+    summary: &'a ReportSummary,
     entries: &'a [JournalEntry],
     selected_entry: usize,
 }
 
-impl<'a> EngineerDetail<'a> {
+impl<'a> ReportDetail<'a> {
     pub fn new(
-        engineer: &'a Engineer,
-        summary: &'a EngineerSummary,
+        report: &'a Report,
+        summary: &'a ReportSummary,
         entries: &'a [JournalEntry],
         selected_entry: usize,
     ) -> Self {
         Self {
-            engineer,
+            report,
             summary,
             entries,
             selected_entry,
@@ -52,7 +51,7 @@ impl<'a> EngineerDetail<'a> {
     }
 
     fn render_profile(&self, frame: &mut Frame, area: Rect) {
-        let block = rpg_block("Engineer Profile");
+        let block = rpg_block("Report Profile");
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
@@ -72,14 +71,22 @@ impl<'a> EngineerDetail<'a> {
     }
 
     fn render_left_column(&self, frame: &mut Frame, area: Rect) {
-        let profile = &self.engineer.profile;
+        let profile = &self.report.profile;
+
+        // Managers have 4-line sprites (with headband), ICs have 3-line sprites
+        let sprite_height: u16 = if self.summary.report_type == ReportType::Manager {
+            4
+        } else {
+            3
+        };
+        let identity_height = sprite_height + 2; // sprite + name row spacing
 
         // Stack: avatar+name (compact) then mood chart
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(5), // Avatar + name + title (compact)
-                Constraint::Min(6),    // Mood chart
+                Constraint::Length(identity_height), // Avatar + name + title (compact)
+                Constraint::Min(6),                  // Mood chart
             ])
             .split(area);
 
@@ -87,19 +94,23 @@ impl<'a> EngineerDetail<'a> {
         let identity_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(12), // Avatar
+                Constraint::Length(15), // Avatar (wider for Zz indicators)
                 Constraint::Min(10),    // Name + title
             ])
             .split(chunks[0]);
 
-        // Avatar (3 lines, centered vertically in 5-line area)
+        // Avatar (3-4 lines depending on report type, centered vertically)
         let sprite = sprites::FaceSprite::from_summary(
             self.summary,
             Style::default().fg(self.summary.color),
         );
         let avatar_area = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Length(3), Constraint::Min(0)])
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(sprite_height),
+                Constraint::Min(0),
+            ])
             .split(identity_chunks[0]);
         let avatar_para = Paragraph::new(sprite.lines()).alignment(Alignment::Center);
         frame.render_widget(avatar_para, avatar_area[1]);
@@ -121,7 +132,7 @@ impl<'a> EngineerDetail<'a> {
         ));
         frame.render_widget(Paragraph::new(name_line), name_area[1]);
 
-        let title_text = profile.title.as_deref().unwrap_or("Engineer");
+        let title_text = profile.title.as_deref().unwrap_or("Report");
         let level_text = profile.level.as_deref().unwrap_or("-");
         let title_level_line = Line::from(vec![
             Span::styled(title_text, style_muted()),
@@ -135,7 +146,7 @@ impl<'a> EngineerDetail<'a> {
     }
 
     fn render_right_column(&self, frame: &mut Frame, area: Rect) {
-        let profile = &self.engineer.profile;
+        let profile = &self.report.profile;
         let has_bio = profile.partner.is_some() || !profile.children.is_empty();
 
         let rows = if has_bio {
@@ -158,7 +169,7 @@ impl<'a> EngineerDetail<'a> {
     }
 
     fn render_stats_panel(&self, frame: &mut Frame, area: Rect) {
-        let profile = &self.engineer.profile;
+        let profile = &self.report.profile;
 
         let block = Block::default()
             .borders(Borders::ALL)
@@ -301,7 +312,7 @@ impl<'a> EngineerDetail<'a> {
     }
 
     fn render_bio_panel(&self, frame: &mut Frame, area: Rect) {
-        let profile = &self.engineer.profile;
+        let profile = &self.report.profile;
 
         let block = Block::default()
             .borders(Borders::ALL)

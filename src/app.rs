@@ -7,17 +7,14 @@ use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
+use crate::components::modal::NewReportState;
 use crate::model::{
-    compute_engineer_summary, compute_workspace_summary, Context, Engineer, EngineerSummary,
-    JournalEntry, Workspace, WorkspaceSummary,
+    compute_report_summary, compute_workspace_summary, Context, JournalEntry, ManagerInfo, Report,
+    ReportSummary, Workspace, WorkspaceSummary,
 };
 
 /// Status message display duration
 const STATUS_MESSAGE_DURATION: Duration = Duration::from_secs(3);
-
-/// Default values for new engineer modal
-pub const DEFAULT_LEVEL: &str = "P3";
-pub const DEFAULT_MEETING_FREQUENCY: &str = "biweekly";
 
 /// Side effects that the update function can request
 /// This keeps the TEA pattern pure - update() returns what should happen,
@@ -35,9 +32,9 @@ use crate::storage;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ViewMode {
     Dashboard,
-    EngineerDetail,
+    ReportDetail,
     NoteViewer,
-    NewEngineerModal,
+    NewReportModal,
     DeleteConfirmModal,
     EntryInputModal,
     Help,
@@ -57,9 +54,9 @@ pub enum Msg {
     SelectPrev,
     SelectFirst,
     SelectLast,
-    ViewEngineer,
+    ViewReport,
 
-    // Engineer detail actions
+    // Report detail actions
     ViewMeeting(usize),
     NewMeeting,
 
@@ -72,13 +69,13 @@ pub enum Msg {
     ConfirmDelete,
 
     // Modal actions
-    ShowNewEngineer,
-    CreateEngineer {
-        name: String,
-        level: String,
-        meeting_frequency: String,
-    },
+    ShowNewReport,
+    CreateReport,
     CancelModal,
+    ModalLeft,
+    ModalRight,
+    ModalNextField,
+    ModalPrevField,
 
     // Entry input modal actions (mood observation)
     ShowEntryInput,
@@ -98,25 +95,23 @@ pub enum Msg {
 /// Main application state
 pub struct App {
     pub workspace: Workspace,
-    pub engineers: Vec<Engineer>,
-    pub entries_by_engineer: Vec<Vec<JournalEntry>>,
-    pub summaries: Vec<EngineerSummary>,
+    pub reports: Vec<Report>,
+    pub entries_by_report: Vec<Vec<JournalEntry>>,
+    pub summaries: Vec<ReportSummary>,
     pub workspace_summary: WorkspaceSummary,
 
     // UI state
     pub view_mode: ViewMode,
     pub selected_index: usize,
-    pub selected_engineer_index: Option<usize>,
+    pub selected_report_index: Option<usize>,
     pub selected_entry_index: Option<usize>,
 
     // Note viewer state
     pub editor_content: String,
     pub editor_mood: Option<u8>,
 
-    // Modal state
-    pub modal_input: String,
-    pub modal_field_index: usize,
-    pub modal_fields: Vec<String>,
+    // New report modal state
+    pub new_report_state: NewReportState,
 
     // Entry input modal state
     pub pending_entry_mood: Option<u8>,
@@ -129,17 +124,6 @@ pub struct App {
     pub delete_from_list: bool, // Track if delete was initiated from entry list
 }
 
-// Backwards compatibility alias
-impl App {
-    pub fn meetings_by_engineer(&self) -> &Vec<Vec<JournalEntry>> {
-        &self.entries_by_engineer
-    }
-
-    pub fn selected_meeting_index(&self) -> Option<usize> {
-        self.selected_entry_index
-    }
-}
-
 impl App {
     /// Create new application from workspace path
     pub fn new(workspace_path: PathBuf) -> Result<Self> {
@@ -147,24 +131,23 @@ impl App {
 
         let mut app = App {
             workspace,
-            engineers: Vec::new(),
-            entries_by_engineer: Vec::new(),
+            reports: Vec::new(),
+            entries_by_report: Vec::new(),
             summaries: Vec::new(),
             workspace_summary: WorkspaceSummary {
                 team_size: 0,
                 active_count: 0,
                 overdue_count: 0,
                 average_mood: None,
+                total_report_count: 0,
             },
             view_mode: ViewMode::Dashboard,
             selected_index: 0,
-            selected_engineer_index: None,
+            selected_report_index: None,
             selected_entry_index: None,
             editor_content: String::new(),
             editor_mood: None,
-            modal_input: String::new(),
-            modal_field_index: 0,
-            modal_fields: Vec::new(),
+            new_report_state: NewReportState::default(),
             pending_entry_mood: None,
             pending_entry_context: Context::Standup,
             pending_entry_notes: String::new(),
@@ -179,24 +162,37 @@ impl App {
 
     /// Load all data from workspace
     pub fn load_data(&mut self) -> Result<()> {
-        let engineer_dirs = storage::list_engineer_dirs(&self.workspace)?;
+        let report_dirs = storage::list_report_dirs(&self.workspace)?;
 
-        self.engineers.clear();
-        self.entries_by_engineer.clear();
+        self.reports.clear();
+        self.entries_by_report.clear();
         self.summaries.clear();
 
-        // Collect all engineer data
-        let mut all_data: Vec<_> = engineer_dirs
+        // Collect all report data
+        let mut all_data: Vec<_> = report_dirs
             .into_iter()
             .filter_map(|dir| {
-                let engineer = storage::load_engineer(&dir).ok()?;
+                let mut report = storage::load_report(&dir).ok()?;
+
+                // Load team members for managers
+                if storage::has_team_dir(&dir) {
+                    let team_dirs = storage::list_team_member_dirs(&dir).unwrap_or_default();
+                    for team_dir in team_dirs {
+                        if let Ok(team_member) =
+                            storage::load_report_with_manager(&team_dir, &report.slug)
+                        {
+                            report.team.push(team_member);
+                        }
+                    }
+                }
+
                 let entries = storage::load_entries(&dir).unwrap_or_default();
-                let summary = compute_engineer_summary(
-                    &engineer,
+                let summary = compute_report_summary(
+                    &report,
                     &entries,
                     self.workspace.config.settings.overdue_threshold_days,
                 );
-                Some((engineer, entries, summary))
+                Some((report, entries, summary))
             })
             .collect();
 
@@ -204,17 +200,17 @@ impl App {
         all_data.sort_by(|a, b| b.2.urgency_score.cmp(&a.2.urgency_score));
 
         // Unpack into separate vectors
-        for (engineer, entries, summary) in all_data {
-            self.engineers.push(engineer);
-            self.entries_by_engineer.push(entries);
+        for (report, entries, summary) in all_data {
+            self.reports.push(report);
+            self.entries_by_report.push(entries);
             self.summaries.push(summary);
         }
 
         self.workspace_summary = compute_workspace_summary(&self.summaries);
 
         // Reset selection if out of bounds
-        if self.selected_index >= self.engineers.len() && !self.engineers.is_empty() {
-            self.selected_index = self.engineers.len() - 1;
+        if self.selected_index >= self.reports.len() && !self.reports.is_empty() {
+            self.selected_index = self.reports.len() - 1;
         }
 
         Ok(())
@@ -245,35 +241,30 @@ impl App {
         })
     }
 
-    /// Delete an entry by engineer and entry index
+    /// Delete an entry by report and entry index
     /// Returns Ok(()) on success, sets status message on error
-    pub fn delete_entry(&mut self, eng_idx: usize, entry_idx: usize) -> Result<()> {
-        let entry = &self.entries_by_engineer[eng_idx][entry_idx];
+    pub fn delete_entry(&mut self, report_idx: usize, entry_idx: usize) -> Result<()> {
+        let entry = &self.entries_by_report[report_idx][entry_idx];
         let path = entry.path.clone();
 
         // Delete the file
         std::fs::remove_file(&path)?;
 
         // Remove from in-memory list
-        self.entries_by_engineer[eng_idx].remove(entry_idx);
+        self.entries_by_report[report_idx].remove(entry_idx);
         self.selected_entry_index = None;
 
-        // Recompute summary for this engineer
-        let engineer = &self.engineers[eng_idx];
-        let entries = &self.entries_by_engineer[eng_idx];
-        self.summaries[eng_idx] = compute_engineer_summary(
-            engineer,
+        // Recompute summary for this report
+        let report = &self.reports[report_idx];
+        let entries = &self.entries_by_report[report_idx];
+        self.summaries[report_idx] = compute_report_summary(
+            report,
             entries,
             self.workspace.config.settings.overdue_threshold_days,
         );
         self.workspace_summary = compute_workspace_summary(&self.summaries);
 
         Ok(())
-    }
-
-    /// Backwards compatibility alias
-    pub fn delete_meeting(&mut self, eng_idx: usize, meet_idx: usize) -> Result<()> {
-        self.delete_entry(eng_idx, meet_idx)
     }
 
     /// Process a message and update state (TEA update function)
@@ -287,30 +278,30 @@ impl App {
 
             Msg::Back => {
                 match self.view_mode {
-                    ViewMode::EngineerDetail => {
-                        // Restore engineer selection for dashboard navigation
-                        if let Some(eng_idx) = self.selected_engineer_index {
-                            self.selected_index = eng_idx;
+                    ViewMode::ReportDetail => {
+                        // Restore report selection for dashboard navigation
+                        if let Some(report_idx) = self.selected_report_index {
+                            self.selected_index = report_idx;
                         }
                         self.view_mode = ViewMode::Dashboard;
-                        self.selected_engineer_index = None;
+                        self.selected_report_index = None;
                     }
                     ViewMode::NoteViewer => {
-                        self.view_mode = ViewMode::EngineerDetail;
+                        self.view_mode = ViewMode::ReportDetail;
                         self.selected_entry_index = None;
                     }
-                    ViewMode::Help | ViewMode::NewEngineerModal => {
+                    ViewMode::Help | ViewMode::NewReportModal => {
                         self.view_mode = ViewMode::Dashboard;
                     }
                     ViewMode::EntryInputModal => {
-                        self.view_mode = ViewMode::EngineerDetail;
+                        self.view_mode = ViewMode::ReportDetail;
                         self.pending_entry_mood = None;
                         self.pending_entry_notes.clear();
                     }
                     ViewMode::DeleteConfirmModal => {
                         if self.delete_from_list {
                             self.selected_entry_index = None;
-                            self.view_mode = ViewMode::EngineerDetail;
+                            self.view_mode = ViewMode::ReportDetail;
                         } else {
                             self.view_mode = ViewMode::NoteViewer;
                         }
@@ -363,20 +354,20 @@ impl App {
                 Effect::None
             }
 
-            Msg::ViewEngineer => {
-                if !self.engineers.is_empty() {
-                    self.selected_engineer_index = Some(self.selected_index);
+            Msg::ViewReport => {
+                if !self.reports.is_empty() {
+                    self.selected_report_index = Some(self.selected_index);
                     self.selected_index = 0; // Reset for meeting navigation
-                    self.view_mode = ViewMode::EngineerDetail;
+                    self.view_mode = ViewMode::ReportDetail;
                 }
                 Effect::None
             }
 
             Msg::ViewMeeting(display_index) => {
                 if let Some(actual_index) = self.meeting_display_to_entry_index(display_index) {
-                    if let Some(eng_idx) = self.selected_engineer_index {
+                    if let Some(report_idx) = self.selected_report_index {
                         self.selected_entry_index = Some(actual_index);
-                        let entry = &self.entries_by_engineer[eng_idx][actual_index];
+                        let entry = &self.entries_by_report[report_idx][actual_index];
                         self.editor_content = entry.content.clone();
                         self.editor_mood = entry.mood();
                         self.view_mode = ViewMode::NoteViewer;
@@ -386,15 +377,15 @@ impl App {
             }
 
             Msg::NewMeeting => {
-                if let Some(eng_idx) = self.selected_engineer_index {
-                    let engineer = &self.engineers[eng_idx];
-                    match storage::create_meeting(&engineer.path, None) {
+                if let Some(report_idx) = self.selected_report_index {
+                    let report = &self.reports[report_idx];
+                    match storage::create_meeting(&report.path, None) {
                         Ok(meeting) => {
                             self.editor_content = meeting.content.clone();
                             self.editor_mood = None;
-                            self.entries_by_engineer[eng_idx].push(meeting);
+                            self.entries_by_report[report_idx].push(meeting);
                             self.selected_entry_index =
-                                Some(self.entries_by_engineer[eng_idx].len() - 1);
+                                Some(self.entries_by_report[report_idx].len() - 1);
                             self.view_mode = ViewMode::NoteViewer;
                             return Ok(Effect::SpawnEditor { is_new: true });
                         }
@@ -410,9 +401,9 @@ impl App {
 
             Msg::EditMeetingFromList(display_index) => {
                 if let Some(actual_index) = self.meeting_display_to_entry_index(display_index) {
-                    if let Some(eng_idx) = self.selected_engineer_index {
+                    if let Some(report_idx) = self.selected_report_index {
                         self.selected_entry_index = Some(actual_index);
-                        let entry = &self.entries_by_engineer[eng_idx][actual_index];
+                        let entry = &self.entries_by_report[report_idx][actual_index];
                         self.editor_content = entry.content.clone();
                         self.editor_mood = entry.mood();
                         // Don't change view mode - go straight to editor
@@ -425,10 +416,10 @@ impl App {
             Msg::UpdateMood(mood) => {
                 self.editor_mood = Some(mood);
                 // Save mood to disk immediately
-                if let (Some(eng_idx), Some(meet_idx)) =
-                    (self.selected_engineer_index, self.selected_entry_index)
+                if let (Some(report_idx), Some(meet_idx)) =
+                    (self.selected_report_index, self.selected_entry_index)
                 {
-                    let meeting = &mut self.entries_by_engineer[eng_idx][meet_idx];
+                    let meeting = &mut self.entries_by_report[report_idx][meet_idx];
                     meeting.frontmatter.mood = Some(mood);
                     if let Err(e) = storage::save_meeting(meeting) {
                         self.set_status(format!("Error saving mood: {}", e));
@@ -440,12 +431,12 @@ impl App {
             }
 
             Msg::ShowDeleteConfirm => {
-                // Handle delete from both NoteViewer and EngineerDetail
+                // Handle delete from both NoteViewer and ReportDetail
                 if self.view_mode == ViewMode::NoteViewer {
                     // Already viewing a meeting - selected_entry_index already set
                     self.delete_from_list = false;
                     self.view_mode = ViewMode::DeleteConfirmModal;
-                } else if self.view_mode == ViewMode::EngineerDetail {
+                } else if self.view_mode == ViewMode::ReportDetail {
                     // Deleting from the meeting list - map display index to entry index
                     if let Some(actual_index) =
                         self.meeting_display_to_entry_index(self.selected_index)
@@ -459,46 +450,55 @@ impl App {
             }
 
             Msg::ConfirmDelete => {
-                if let (Some(eng_idx), Some(meet_idx)) =
-                    (self.selected_engineer_index, self.selected_entry_index)
+                if let (Some(report_idx), Some(entry_idx)) =
+                    (self.selected_report_index, self.selected_entry_index)
                 {
-                    match self.delete_meeting(eng_idx, meet_idx) {
+                    match self.delete_entry(report_idx, entry_idx) {
                         Ok(()) => {
-                            self.view_mode = ViewMode::EngineerDetail;
-                            self.set_status("Meeting deleted");
+                            self.view_mode = ViewMode::ReportDetail;
+                            self.set_status("Entry deleted");
                         }
                         Err(e) => {
-                            self.set_status(format!("Error deleting meeting: {}", e));
+                            self.set_status(format!("Error deleting entry: {}", e));
                         }
                     }
                 }
                 Effect::None
             }
 
-            Msg::ShowNewEngineer => {
-                self.modal_input.clear();
-                self.modal_field_index = 0;
-                self.modal_fields = vec![
-                    String::new(),
-                    String::from(DEFAULT_LEVEL),
-                    String::from(DEFAULT_MEETING_FREQUENCY),
-                ];
-                self.view_mode = ViewMode::NewEngineerModal;
+            Msg::ShowNewReport => {
+                self.new_report_state = NewReportState::default();
+                self.view_mode = ViewMode::NewReportModal;
                 Effect::None
             }
 
-            Msg::CreateEngineer {
-                name,
-                level,
-                meeting_frequency,
-            } => {
-                let profile = crate::model::EngineerProfile {
+            Msg::CreateReport => {
+                if !self.new_report_state.is_valid() {
+                    self.set_status("Name and Title are required");
+                    return Ok(Effect::None);
+                }
+
+                let name = self.new_report_state.name.clone();
+                let title = self.new_report_state.title.clone();
+                let level = self.new_report_state.level_str();
+                let meeting_frequency = self.new_report_state.frequency_str().to_string();
+                let report_type = self.new_report_state.report_type;
+
+                let manager_info = if report_type.is_manager() {
+                    Some(ManagerInfo { team_name: None })
+                } else {
+                    None
+                };
+
+                let profile = crate::model::ReportProfile {
                     name: name.clone(),
-                    title: None,
+                    title: Some(title),
                     start_date: Some(chrono::Local::now().date_naive()),
                     level: Some(level),
                     meeting_frequency,
                     active: true,
+                    report_type,
+                    manager_info,
                     birthday: None,
                     partner: None,
                     children: vec![],
@@ -507,10 +507,16 @@ impl App {
                     color: None,
                 };
 
-                match storage::create_engineer(&self.workspace.path, &name, profile) {
+                let type_label = if report_type.is_manager() {
+                    "manager"
+                } else {
+                    "IC"
+                };
+
+                match storage::create_report(&self.workspace.path, &name, profile) {
                     Ok(_) => {
                         self.load_data()?;
-                        self.set_status(format!("Created {}", name));
+                        self.set_status(format!("Recruited {} ({})", name, type_label));
                     }
                     Err(e) => {
                         self.set_status(format!("Error: {}", e));
@@ -522,20 +528,18 @@ impl App {
 
             Msg::CancelModal => {
                 match self.view_mode {
-                    ViewMode::NewEngineerModal => {
+                    ViewMode::NewReportModal => {
                         self.view_mode = ViewMode::Dashboard;
-                        self.modal_input.clear();
-                        self.modal_fields.clear();
                     }
                     ViewMode::EntryInputModal => {
-                        self.view_mode = ViewMode::EngineerDetail;
+                        self.view_mode = ViewMode::ReportDetail;
                         self.pending_entry_mood = None;
                         self.pending_entry_notes.clear();
                     }
                     ViewMode::DeleteConfirmModal => {
                         if self.delete_from_list {
                             self.selected_entry_index = None;
-                            self.view_mode = ViewMode::EngineerDetail;
+                            self.view_mode = ViewMode::ReportDetail;
                         } else {
                             self.view_mode = ViewMode::NoteViewer;
                         }
@@ -545,9 +549,37 @@ impl App {
                 Effect::None
             }
 
+            Msg::ModalLeft => {
+                if self.view_mode == ViewMode::NewReportModal {
+                    self.new_report_state.handle_left();
+                }
+                Effect::None
+            }
+
+            Msg::ModalRight => {
+                if self.view_mode == ViewMode::NewReportModal {
+                    self.new_report_state.handle_right();
+                }
+                Effect::None
+            }
+
+            Msg::ModalNextField => {
+                if self.view_mode == ViewMode::NewReportModal {
+                    self.new_report_state.next_field();
+                }
+                Effect::None
+            }
+
+            Msg::ModalPrevField => {
+                if self.view_mode == ViewMode::NewReportModal {
+                    self.new_report_state.prev_field();
+                }
+                Effect::None
+            }
+
             // Entry input modal actions (mood observation)
             Msg::ShowEntryInput => {
-                if self.selected_engineer_index.is_some() {
+                if self.selected_report_index.is_some() {
                     self.pending_entry_mood = None;
                     self.pending_entry_context = Context::Standup;
                     self.pending_entry_notes.clear();
@@ -571,21 +603,21 @@ impl App {
             }
 
             Msg::SaveEntry => {
-                if let Some(eng_idx) = self.selected_engineer_index {
-                    let engineer = &self.engineers[eng_idx];
+                if let Some(report_idx) = self.selected_report_index {
+                    let report = &self.reports[report_idx];
                     match storage::create_entry(
-                        &engineer.path,
+                        &report.path,
                         self.pending_entry_mood,
                         Some(self.pending_entry_context),
                         self.pending_entry_notes.clone(),
                     ) {
                         Ok(entry) => {
-                            self.entries_by_engineer[eng_idx].push(entry);
+                            self.entries_by_report[report_idx].push(entry);
                             // Recompute summary
-                            let engineer = &self.engineers[eng_idx];
-                            let entries = &self.entries_by_engineer[eng_idx];
-                            self.summaries[eng_idx] = compute_engineer_summary(
-                                engineer,
+                            let report = &self.reports[report_idx];
+                            let entries = &self.entries_by_report[report_idx];
+                            self.summaries[report_idx] = compute_report_summary(
+                                report,
                                 entries,
                                 self.workspace.config.settings.overdue_threshold_days,
                             );
@@ -598,7 +630,7 @@ impl App {
                     }
                     self.pending_entry_mood = None;
                     self.pending_entry_notes.clear();
-                    self.view_mode = ViewMode::EngineerDetail;
+                    self.view_mode = ViewMode::ReportDetail;
                 }
                 Effect::None
             }
@@ -609,10 +641,8 @@ impl App {
             }
 
             Msg::Input(c) => {
-                if self.view_mode == ViewMode::NewEngineerModal
-                    && self.modal_field_index < self.modal_fields.len()
-                {
-                    self.modal_fields[self.modal_field_index].push(c);
+                if self.view_mode == ViewMode::NewReportModal {
+                    self.new_report_state.handle_char(c);
                 } else if self.view_mode == ViewMode::EntryInputModal {
                     self.pending_entry_notes.push(c);
                 }
@@ -620,10 +650,8 @@ impl App {
             }
 
             Msg::Backspace => {
-                if self.view_mode == ViewMode::NewEngineerModal
-                    && self.modal_field_index < self.modal_fields.len()
-                {
-                    self.modal_fields[self.modal_field_index].pop();
+                if self.view_mode == ViewMode::NewReportModal {
+                    self.new_report_state.handle_backspace();
                 } else if self.view_mode == ViewMode::EntryInputModal {
                     self.pending_entry_notes.pop();
                 }
@@ -631,19 +659,11 @@ impl App {
             }
 
             Msg::Enter => {
-                if self.view_mode == ViewMode::NewEngineerModal {
-                    if self.modal_field_index < 2 {
-                        self.modal_field_index += 1;
-                    } else if !self.modal_fields[0].is_empty() {
-                        // Create the engineer directly
-                        let name = self.modal_fields[0].clone();
-                        let level = self.modal_fields[1].clone();
-                        let meeting_frequency = self.modal_fields[2].clone();
-                        return self.update(Msg::CreateEngineer {
-                            name,
-                            level,
-                            meeting_frequency,
-                        });
+                if self.view_mode == ViewMode::NewReportModal {
+                    if self.new_report_state.is_valid() {
+                        return self.update(Msg::CreateReport);
+                    } else {
+                        self.set_status("Name is required");
                     }
                 }
                 Effect::None
@@ -653,20 +673,20 @@ impl App {
         Ok(effect)
     }
 
-    /// Get entries for currently selected engineer
+    /// Get entries for currently selected report
     pub fn selected_entries(&self) -> Option<&Vec<JournalEntry>> {
-        self.selected_engineer_index
-            .and_then(|i| self.entries_by_engineer.get(i))
+        self.selected_report_index
+            .and_then(|i| self.entries_by_report.get(i))
     }
 
-    /// Get only meetings (entries with content) for currently selected engineer
+    /// Get only meetings (entries with content) for currently selected report
     pub fn selected_meetings(&self) -> Vec<&JournalEntry> {
         self.selected_entries()
             .map(|entries| entries.iter().filter(|e| e.is_meeting()).collect())
             .unwrap_or_default()
     }
 
-    /// Get the number of meetings for currently selected engineer
+    /// Get the number of meetings for currently selected report
     pub fn selected_meeting_count(&self) -> usize {
         self.selected_entries()
             .map(|entries| entries.iter().filter(|e| e.is_meeting()).count())
@@ -692,8 +712,8 @@ impl App {
     /// Get the length of the currently navigable list based on view mode
     fn current_list_len(&self) -> usize {
         match self.view_mode {
-            ViewMode::Dashboard => self.engineers.len(),
-            ViewMode::EngineerDetail => self.selected_meeting_count(),
+            ViewMode::Dashboard => self.reports.len(),
+            ViewMode::ReportDetail => self.selected_meeting_count(),
             _ => 0,
         }
     }
@@ -723,7 +743,7 @@ pub fn handle_key_event(app: &App, key: KeyEvent) -> Option<Msg> {
             KeyCode::Right => Some(Msg::SelectNext),
             KeyCode::Down => Some(Msg::SelectNext),
             KeyCode::Up => Some(Msg::SelectPrev),
-            KeyCode::Enter => Some(Msg::ViewEngineer),
+            KeyCode::Enter => Some(Msg::ViewReport),
             // Character keys (case-insensitive, except g/G)
             KeyCode::Char('g') => Some(Msg::SelectFirst),
             KeyCode::Char('G') => Some(Msg::SelectLast),
@@ -733,8 +753,8 @@ pub fn handle_key_event(app: &App, key: KeyEvent) -> Option<Msg> {
                 'l' => Some(Msg::SelectNext),
                 'j' => Some(Msg::SelectNext),
                 'k' => Some(Msg::SelectPrev),
-                ' ' => Some(Msg::ViewEngineer),
-                'n' => Some(Msg::ShowNewEngineer),
+                ' ' => Some(Msg::ViewReport),
+                'n' => Some(Msg::ShowNewReport),
                 '?' => Some(Msg::ShowHelp),
                 'r' => Some(Msg::RefreshData),
                 _ => None,
@@ -742,7 +762,7 @@ pub fn handle_key_event(app: &App, key: KeyEvent) -> Option<Msg> {
             _ => None,
         },
 
-        ViewMode::EngineerDetail => match key.code {
+        ViewMode::ReportDetail => match key.code {
             // Non-char keys
             KeyCode::Esc | KeyCode::Backspace => Some(Msg::Back),
             KeyCode::Left => Some(Msg::Back),
@@ -813,14 +833,32 @@ pub fn handle_key_event(app: &App, key: KeyEvent) -> Option<Msg> {
             _ => None,
         },
 
-        // Modals that accept text input preserve case
-        ViewMode::NewEngineerModal => match key.code {
-            KeyCode::Esc => Some(Msg::CancelModal),
-            KeyCode::Char(c) => Some(Msg::Input(c)),
-            KeyCode::Backspace => Some(Msg::Backspace),
-            KeyCode::Enter | KeyCode::Tab => Some(Msg::Enter),
-            _ => None,
-        },
+        // New report modal with enhanced navigation
+        ViewMode::NewReportModal => {
+            // Check if we're in a text input field
+            let in_text_field = matches!(
+                app.new_report_state.current_field,
+                crate::components::modal::NewReportField::Name
+                    | crate::components::modal::NewReportField::Title
+            );
+
+            match key.code {
+                KeyCode::Esc => Some(Msg::CancelModal),
+                KeyCode::Left => Some(Msg::ModalLeft),
+                KeyCode::Right => Some(Msg::ModalRight),
+                KeyCode::Up => Some(Msg::ModalPrevField),
+                KeyCode::Down | KeyCode::Tab => Some(Msg::ModalNextField),
+                KeyCode::Enter => Some(Msg::Enter),
+                KeyCode::Backspace => Some(Msg::Backspace),
+                // vim keys only work in non-text fields
+                KeyCode::Char('h') if !in_text_field => Some(Msg::ModalLeft),
+                KeyCode::Char('l') if !in_text_field => Some(Msg::ModalRight),
+                KeyCode::Char('k') if !in_text_field => Some(Msg::ModalPrevField),
+                KeyCode::Char('j') if !in_text_field => Some(Msg::ModalNextField),
+                KeyCode::Char(c) => Some(Msg::Input(c)),
+                _ => None,
+            }
+        }
 
         ViewMode::EntryInputModal => match key.code {
             KeyCode::Esc => Some(Msg::CancelModal),

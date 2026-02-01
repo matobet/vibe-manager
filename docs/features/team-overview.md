@@ -260,9 +260,9 @@ Engineers appear left-to-right, top-to-bottom by descending urgency score. The f
 
 ## 5. UI Components
 
-### 5.1 Engineer Card/Row
+### 5.1 Report Card/Row
 
-The primary display unit for each team member, styled as an RPG character card with a distinctive color border (derived from the engineer's name) and a kaomoji avatar.
+The primary display unit for each report (IC or manager), styled as an RPG character card with a distinctive color border (derived from the report's name) and a kaomoji avatar.
 
 **TUI Implementation - Kaomoji Avatar Cards:**
 ```
@@ -276,17 +276,50 @@ The primary display unit for each team member, styled as an RPG character card w
  ╰───────────╯        ╚═══════════╝
 ```
 
-**Avatar Frame Styles by Level:**
-- P1-P2: Rounded/simple corners (`╭─────╮` / `┌─────┐`)
-- P3: Double-line box (`╔═════╗`)
-- P4: Double-line with hollow star (`╔═ ☆ ═╗`)
-- P5: Double-line with filled star (`╔═ ★ ═╗`)
+#### Avatar Reference
+
+**IC Track (P1-P5) - 3 lines:**
+```
+P1: ╭─────╮  P2: ┌─────┐  P3: ╔═════╗  P4: ╔══★══╗  P5: ╔═★═★═╗
+    │ •_• │      │ •_• │      ║ •_• ║      ║ •_• ║      ║ •_• ║
+    ╰─────╯      └─────┘      ╚═════╝      ╚═════╝      ╚═════╝
+```
+
+**Manager Track (M1-M5) - 4 lines:**
+```
+M1: ╭─────╮  M2: ┌─────┐  M3: ╔═════╗  M4: ╔═════╗  M5: ╔═════╗
+    │──◇──│      │══◆══│      ║══★══║      ║═★═★═║      ║★═★═★║
+    │ •_• │      │ •_• │      ║ •_• ║      ║ •_• ║      ║ •_• ║
+    ╰─────╯      └─────┘      ╚═════╝      ╚═════╝      ╚═════╝
+```
+
+**Face Expressions:**
+
+| Mood | Expression | Note |
+|------|------------|------|
+| 5 | `^‿^` | Blissful |
+| 4 | `◕‿◕` | Happy |
+| 3 | `•_•` | Neutral |
+| 2 | `◦︵◦` | Worried (shifted left for alignment) |
+| 1 | `x_x` | Stressed |
+| Overdue | `-_-` | Sleepy |
+
+**Overdue Indicators:**
+- Slightly overdue: ` z` / ` Z` on right
+- Very overdue (>14d): ` zZ` / `ZzZ` on right
+
+**Avatar Frame Styles by Level (IC Track):**
+- P1: Rounded corners (`╭─────╮`) - newcomer
+- P2: Square corners (`┌─────┐`) - solid contributor
+- P3: Double-line box (`╔═════╗`) - senior
+- P4: Double-line with single filled star (`╔══★══╗`) - staff
+- P5: Double-line with double filled stars (`╔═★═★═╗`) - distinguished
 
 **Kaomoji Expressions by Mood:**
 - Mood 5: `^‿^` (blissful)
 - Mood 4: `◕‿◕` (happy)
 - Mood 3: `•_•` (neutral)
-- Mood 2: `◦︵◦` (worried)
+- Mood 2: `◦︵◦` (worried - shifted left for alignment due to fullwidth character)
 - Mood 1: `x_x` (stressed)
 - Overdue (no meeting in 2+ frequencies): `-_- zzz` (sleeping/neglected)
 

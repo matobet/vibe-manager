@@ -87,6 +87,19 @@ pub fn style_muted() -> Style {
     Style::default().fg(COLOR_MUTED)
 }
 
+/// Style for selected/unselected options in selection lists
+///
+/// Returns bold secondary color for selected items, muted for unselected.
+pub fn selection_style(is_selected: bool) -> Style {
+    if is_selected {
+        Style::default()
+            .fg(COLOR_SECONDARY)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        style_muted()
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Borders & Blocks
 // ═══════════════════════════════════════════════════════════════

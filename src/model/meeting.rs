@@ -1,25 +1,37 @@
-//! Unified JournalEntry model for meetings and mood observations
+//! Journal entry model for meetings and mood observations
 //!
 //! A journal entry has a timestamp, optional mood, optional context, and optional notes.
-//! - A meeting = entry with context `Meeting` and non-empty content
-//! - A mood observation = entry with mood, minimal/no content
+//!
+//! ## Entry Types
+//!
+//! - **Meeting**: Entry with context `Meeting` and non-empty content. These are
+//!   formal 1-on-1 meetings that count toward the meeting schedule.
+//! - **Mood observation**: Entry with mood but minimal/no content. Quick notes
+//!   from standups, Slack, or other interactions.
+//!
+//! ## File Naming
+//!
+//! - Full timestamp: `YYYY-MM-DDTHHMMSS.md` (e.g., `2026-01-15T143000.md`)
+//! - Legacy date-only: `YYYY-MM-DD.md` (treated as midnight)
 
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-/// Context for an entry - what kind of interaction it was
+/// Context for a journal entry - what kind of interaction it was
+///
+/// Used to distinguish formal meetings from casual observations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Context {
-    /// 1-on-1 meeting
+    /// Formal 1-on-1 meeting (counts toward schedule)
     #[default]
     Meeting,
-    /// Standup or team sync
+    /// Standup or team sync observation
     Standup,
     /// Written communication (Slack, email)
     Slack,
-    /// Other interaction
+    /// Other informal interaction
     Other,
 }
 
@@ -73,19 +85,31 @@ impl Context {
     }
 }
 
+/// YAML frontmatter for a journal entry
+///
+/// Stored between `---` delimiters at the start of the markdown file.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct JournalEntryFrontmatter {
+    /// Mood rating from 1 (low) to 5 (high)
     #[serde(default)]
     pub mood: Option<u8>,
+    /// Context of the interaction
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<Context>,
 }
 
+/// A journal entry (meeting or mood observation)
+///
+/// Loaded from a markdown file in the report's directory or `journal/` subdirectory.
 #[derive(Debug, Clone)]
 pub struct JournalEntry {
+    /// When this entry was created
     pub timestamp: NaiveDateTime,
+    /// Filesystem path to the markdown file
     pub path: PathBuf,
+    /// Parsed frontmatter (mood, context)
     pub frontmatter: JournalEntryFrontmatter,
+    /// Markdown content (body after frontmatter)
     pub content: String,
 }
 
@@ -166,15 +190,6 @@ pub fn parse_entry_timestamp(filename: &str) -> Option<NaiveDateTime> {
 /// Format timestamp for filename (filesystem-safe ISO 8601)
 pub fn format_entry_filename(timestamp: NaiveDateTime) -> String {
     format!("{}.md", timestamp.format("%Y-%m-%dT%H%M%S"))
-}
-
-// Backwards compatibility aliases
-pub type Meeting = JournalEntry;
-pub type MeetingFrontmatter = JournalEntryFrontmatter;
-
-/// Legacy function for backwards compatibility
-pub fn parse_meeting_date(filename: &str) -> Option<NaiveDate> {
-    parse_entry_timestamp(filename).map(|dt| dt.date())
 }
 
 #[cfg(test)]
@@ -294,16 +309,5 @@ mod tests {
             String::new(),
         );
         assert!(entry.has_time());
-    }
-
-    // Legacy compatibility tests
-    #[test]
-    fn test_parse_meeting_date() {
-        assert_eq!(
-            parse_meeting_date("2026-01-15.md"),
-            Some(NaiveDate::from_ymd_opt(2026, 1, 15).unwrap())
-        );
-        assert_eq!(parse_meeting_date("invalid.md"), None);
-        assert_eq!(parse_meeting_date("_profile.md"), None);
     }
 }

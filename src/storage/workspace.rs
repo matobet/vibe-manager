@@ -1,9 +1,16 @@
+//! Workspace storage operations
+//!
+//! Handles loading, saving, and discovering workspaces and their reports.
+//!
+//! A workspace is identified by a `.vibe-manager` file in the root directory.
+
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::{StorageError, StorageResult};
 use crate::model::{Workspace, WorkspaceConfig};
 
+/// Name of the workspace configuration file
 const WORKSPACE_FILE: &str = ".vibe-manager";
 
 /// Check if a directory is a valid workspace

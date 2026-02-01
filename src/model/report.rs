@@ -1,9 +1,17 @@
+//! Report data model
+//!
+//! A Report represents a direct report (team member) with their profile,
+//! career information, and for managers, their team hierarchy.
+
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Type of report - Individual Contributor or Manager
+///
+/// Determines the career track (P-track vs M-track) and whether
+/// the report can have their own team members.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ReportType {
@@ -22,24 +30,39 @@ impl ReportType {
     }
 }
 
-/// Manager-specific information (only present for report_type: manager)
+/// Manager-specific information
+///
+/// Only present when `report_type` is `Manager`. Contains metadata
+/// about the manager's team.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ManagerInfo {
+    /// Optional team name (e.g., "Platform Team")
     #[serde(default)]
     pub team_name: Option<String>,
 }
 
+/// Profile information for a report (team member)
+///
+/// This is the data stored in the `_profile.md` frontmatter.
+/// Contains professional info (level, frequency) and personal info
+/// (birthday, family) for building rapport.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReportProfile {
+    /// Full name of the report
     pub name: String,
+    /// Job title (e.g., "Software Engineer")
     #[serde(default)]
     pub title: Option<String>,
+    /// Start date at company
     #[serde(default)]
     pub start_date: Option<NaiveDate>,
+    /// Career level (P1-P5 for ICs, M1-M5 for managers)
     #[serde(default)]
     pub level: Option<String>,
+    /// How often to meet (weekly, biweekly, monthly)
     #[serde(default = "default_meeting_frequency", alias = "cadence")]
     pub meeting_frequency: String,
+    /// Whether the report is currently active
     #[serde(default = "default_active")]
     pub active: bool,
 
@@ -51,21 +74,26 @@ pub struct ReportProfile {
     #[serde(default)]
     pub manager_info: Option<ManagerInfo>,
 
-    // Personal info
+    // Personal info for building rapport
+    /// Birthday for remembering
     #[serde(default)]
     pub birthday: Option<NaiveDate>,
+    /// Partner's name
     #[serde(default)]
     pub partner: Option<String>,
+    /// Children's names
     #[serde(default)]
     pub children: Vec<String>,
 
-    // Skills
+    // Skills tracking
+    /// Skill assessments by category
     #[serde(default)]
     pub skills: Option<Skills>,
+    /// When skills were last updated
     #[serde(default)]
     pub skills_updated: Option<NaiveDate>,
 
-    // Display color (auto-generated from name hash if not set)
+    /// Display color (auto-generated from name hash if not set)
     #[serde(default)]
     pub color: Option<String>,
 }
@@ -78,27 +106,42 @@ fn default_active() -> bool {
     true
 }
 
+/// Skill assessments organized by category
+///
+/// Each category maps skill names to proficiency levels or notes.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Skills {
+    /// Technical skills (coding, architecture, etc.)
     #[serde(default)]
     pub technical: HashMap<String, String>,
+    /// Delivery skills (planning, execution, etc.)
     #[serde(default)]
     pub delivery: HashMap<String, String>,
+    /// Collaboration skills (communication, teamwork, etc.)
     #[serde(default)]
     pub collaboration: HashMap<String, String>,
+    /// Leadership skills (mentoring, influence, etc.)
     #[serde(default)]
     pub leadership: HashMap<String, String>,
 }
 
+/// A loaded report with profile and filesystem location
+///
+/// Represents a team member loaded from their directory. Contains
+/// the parsed profile, path for saving, and for managers, their team.
 #[derive(Debug, Clone)]
 pub struct Report {
+    /// URL-safe identifier derived from name (e.g., "alex-chen")
     pub slug: String,
+    /// Filesystem path to the report directory
     pub path: PathBuf,
+    /// Parsed profile data from `_profile.md`
     pub profile: ReportProfile,
+    /// Markdown content from `_profile.md` body
     pub notes_content: String,
     /// For 2nd-level reports, the slug of their manager (your direct report)
     pub manager_slug: Option<String>,
-    /// For managers, their 2nd-level reports
+    /// For managers, their 2nd-level reports (skip-levels)
     pub team: Vec<Report>,
 }
 
@@ -156,22 +199,35 @@ impl Report {
     }
 }
 
-/// Career level tracks - supports both IC (P-track) and Manager (M-track)
+/// Career level for IC (P-track) and Manager (M-track)
+///
+/// In the RPG theme, ICs are "Adventurers" and Managers are "Lieutenants".
+/// Each track has 5 levels representing career progression.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Level {
     // IC Track (Adventurers)
-    P1, // Junior
-    P2, // Mid-level
-    P3, // Senior
-    P4, // Staff
-    P5, // Principal
+    /// Junior Engineer
+    P1,
+    /// Mid-level Engineer
+    P2,
+    /// Senior Engineer
+    P3,
+    /// Staff Engineer
+    P4,
+    /// Principal Engineer
+    P5,
 
     // Manager Track (Lieutenants)
-    M1, // Team Lead
-    M2, // Engineering Manager
-    M3, // Senior Manager
-    M4, // Director
-    M5, // Senior Director / VP
+    /// Team Lead
+    M1,
+    /// Engineering Manager
+    M2,
+    /// Senior Manager
+    M3,
+    /// Director
+    M4,
+    /// Senior Director / VP
+    M5,
 }
 
 impl Level {
@@ -240,10 +296,14 @@ impl Level {
     }
 }
 
+/// How often 1-on-1 meetings should occur
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MeetingFrequency {
+    /// Every week (7 days)
     Weekly,
+    /// Every two weeks (14 days)
     Biweekly,
+    /// Once a month (30 days)
     Monthly,
 }
 

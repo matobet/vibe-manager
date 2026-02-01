@@ -1,13 +1,19 @@
+//! Report profile storage operations
+//!
+//! Handles loading and saving report profiles from the filesystem.
+
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::{parse_frontmatter, StorageError, StorageResult};
 use crate::model::{Report, ReportProfile};
 
 const PROFILE_FILE: &str = "_profile.md";
 
-/// Load report profile from directory
-pub fn load_report(dir: &Path) -> StorageResult<Report> {
+/// Load the base components of a report profile from a directory
+///
+/// Returns (slug, path, profile, notes_content) for further processing
+fn load_report_base(dir: &Path) -> StorageResult<(String, PathBuf, ReportProfile, String)> {
     let profile_path = dir.join(PROFILE_FILE);
 
     if !profile_path.exists() {
@@ -18,8 +24,8 @@ pub fn load_report(dir: &Path) -> StorageResult<Report> {
     let (frontmatter, body) = parse_frontmatter(&content);
 
     let profile: ReportProfile = match frontmatter {
-        Some(fm) => serde_yaml::from_str(fm)?,
-        None => {
+        Some(fm) if !fm.is_empty() => serde_yaml::from_str(fm)?,
+        _ => {
             return Err(StorageError::InvalidWorkspace(
                 "Profile missing frontmatter".to_string(),
             ))
@@ -32,45 +38,23 @@ pub fn load_report(dir: &Path) -> StorageResult<Report> {
         .unwrap_or("unknown")
         .to_string();
 
-    Ok(Report::new(
-        slug,
-        dir.to_path_buf(),
-        profile,
-        body.to_string(),
-    ))
+    Ok((slug, dir.to_path_buf(), profile, body.to_string()))
+}
+
+/// Load report profile from directory
+pub fn load_report(dir: &Path) -> StorageResult<Report> {
+    let (slug, path, profile, notes_content) = load_report_base(dir)?;
+    Ok(Report::new(slug, path, profile, notes_content))
 }
 
 /// Load report profile from directory with manager context (for 2nd-level reports)
 pub fn load_report_with_manager(dir: &Path, manager_slug: &str) -> StorageResult<Report> {
-    let profile_path = dir.join(PROFILE_FILE);
-
-    if !profile_path.exists() {
-        return Err(StorageError::ProfileNotFound(format!("{:?}", profile_path)));
-    }
-
-    let content = fs::read_to_string(&profile_path)?;
-    let (frontmatter, body) = parse_frontmatter(&content);
-
-    let profile: ReportProfile = match frontmatter {
-        Some(fm) => serde_yaml::from_str(fm)?,
-        None => {
-            return Err(StorageError::InvalidWorkspace(
-                "Profile missing frontmatter".to_string(),
-            ))
-        }
-    };
-
-    let slug = dir
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("unknown")
-        .to_string();
-
+    let (slug, path, profile, notes_content) = load_report_base(dir)?;
     Ok(Report::new_with_manager(
         slug,
-        dir.to_path_buf(),
+        path,
         profile,
-        body.to_string(),
+        notes_content,
         manager_slug.to_string(),
     ))
 }

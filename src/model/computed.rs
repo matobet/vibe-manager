@@ -1,48 +1,71 @@
+//! Computed summaries and metrics
+//!
+//! These types are derived from reports and entries at runtime, not stored.
+//! They provide aggregated views for the dashboard and detail screens.
+
 use chrono::Local;
 use ratatui::style::Color;
 
 use super::{JournalEntry, Report, ReportType};
 use crate::utils::report_color;
 
+/// Computed summary for a single report
+///
+/// Contains derived metrics like days since last meeting, mood trends,
+/// and urgency scores. Recalculated when data changes.
 #[derive(Debug, Clone)]
 pub struct ReportSummary {
+    /// Report's display name
     pub name: String,
+    /// Career level (P1-P5 or M1-M5)
     pub level: String,
+    /// Meeting frequency (weekly, biweekly, monthly)
     pub meeting_frequency: String,
+    /// Whether the report is currently active
     pub active: bool,
+    /// Days since the last formal meeting (None if never met)
     pub days_since_meeting: Option<i64>,
+    /// Whether a meeting is overdue
     pub is_overdue: bool,
+    /// Recent mood trend direction
     pub mood_trend: Option<MoodTrend>,
+    /// Most recent mood rating (1-5)
     pub recent_mood: Option<u8>,
-    /// Display color for the report (derived from name hash or explicit color)
+    /// Display color (derived from name hash or explicit)
     pub color: Color,
     /// Urgency score for sorting (higher = needs more attention)
     pub urgency_score: i32,
     /// Report type (IC or Manager)
     pub report_type: ReportType,
-    /// For managers: team metrics
+    /// For managers: aggregated team metrics
     pub team_metrics: Option<TeamMetrics>,
 }
 
-/// Team metrics computed for managers
+/// Aggregated team metrics for managers
+///
+/// Computed from the summaries of a manager's 2nd-level reports.
 #[derive(Debug, Clone)]
 pub struct TeamMetrics {
     /// Number of 2nd-level reports
     pub team_size: usize,
-    /// Average mood across the team
+    /// Average mood across the team (1.0-5.0)
     pub team_average_mood: Option<f32>,
-    /// Team mood trend direction
+    /// Aggregated team mood trend
     pub team_mood_trend: Option<MoodTrend>,
     /// Number of team members overdue for meetings
     pub team_overdue_count: usize,
-    /// Composite team health score (0-100)
+    /// Composite team health score (0-100, higher is healthier)
     pub team_health_score: u8,
 }
 
+/// Direction of mood change over recent entries
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MoodTrend {
+    /// Mood is improving
     Rising,
+    /// Mood is stable
     Stable,
+    /// Mood is declining
     Falling,
 }
 

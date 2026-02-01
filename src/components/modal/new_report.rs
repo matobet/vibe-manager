@@ -1,69 +1,49 @@
-//! Modal dialog system
+//! New report modal
+//!
+//! Modal dialog for creating a new report (team member) with IC/Manager support.
 
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
+    widgets::{Block, BorderType, Borders, Paragraph},
     Frame,
 };
 
 use crate::model::ReportType;
 use crate::theme::{
-    focused_block, style_header, style_muted, style_title, COLOR_PRIMARY, COLOR_SECONDARY,
+    focused_block, selection_style, style_header, style_muted, style_title, COLOR_PRIMARY,
+    COLOR_SECONDARY,
 };
-
-/// Render a centered modal dialog
-pub fn render_modal(frame: &mut Frame, area: Rect, width: u16, height: u16) -> Rect {
-    let popup_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length((area.height.saturating_sub(height)) / 2),
-            Constraint::Length(height),
-            Constraint::Min(0),
-        ])
-        .split(area);
-
-    let popup_area = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Length((area.width.saturating_sub(width)) / 2),
-            Constraint::Length(width),
-            Constraint::Min(0),
-        ])
-        .split(popup_layout[1])[1];
-
-    // Clear the area behind the modal
-    frame.render_widget(Clear, popup_area);
-
-    popup_area
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// NEW REPORT MODAL - Enhanced UX with IC/Manager support
-// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Field indices for the new report modal
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NewReportField {
+    /// Report type selector (IC/Manager)
     ReportType = 0,
+    /// Name input field
     Name = 1,
+    /// Job title input field
     Title = 2,
+    /// Level selector (P1-P5 or M1-M5)
     Level = 3,
+    /// Meeting frequency selector
     Frequency = 4,
 }
 
 impl NewReportField {
+    /// Move to the next field (with wrap-around)
     pub fn next(self) -> Self {
         match self {
             Self::ReportType => Self::Name,
             Self::Name => Self::Title,
             Self::Title => Self::Level,
             Self::Level => Self::Frequency,
-            Self::Frequency => Self::ReportType, // Wrap around
+            Self::Frequency => Self::ReportType,
         }
     }
 
+    /// Move to the previous field (with wrap-around)
     pub fn prev(self) -> Self {
         match self {
             Self::ReportType => Self::Frequency,
@@ -75,14 +55,20 @@ impl NewReportField {
     }
 }
 
-/// State for the new report modal
+/// State for the new report modal form
 #[derive(Debug, Clone)]
 pub struct NewReportState {
+    /// Report type (IC or Manager)
     pub report_type: ReportType,
+    /// Report name
     pub name: String,
-    pub title: String,          // Job title (required)
-    pub level_index: usize,     // 0-4 for P1-P5 or M1-M5
-    pub frequency_index: usize, // 0=weekly, 1=biweekly, 2=monthly
+    /// Job title (required)
+    pub title: String,
+    /// Level index (0-4 for P1-P5 or M1-M5)
+    pub level_index: usize,
+    /// Frequency index (0=weekly, 1=biweekly, 2=monthly)
+    pub frequency_index: usize,
+    /// Currently focused field
     pub current_field: NewReportField,
 }
 
@@ -92,14 +78,15 @@ impl Default for NewReportState {
             report_type: ReportType::Individual,
             name: String::new(),
             title: String::new(),
-            level_index: 2,                            // P3/M3 default
-            frequency_index: 1,                        // biweekly default
-            current_field: NewReportField::ReportType, // Start at type selector
+            level_index: 2,     // P3/M3 default
+            frequency_index: 1, // biweekly default
+            current_field: NewReportField::ReportType,
         }
     }
 }
 
 impl NewReportState {
+    /// Get the level string (e.g., "P3" or "M2")
     pub fn level_str(&self) -> String {
         let prefix = if self.report_type.is_manager() {
             "M"
@@ -109,6 +96,7 @@ impl NewReportState {
         format!("{}{}", prefix, self.level_index + 1)
     }
 
+    /// Get the frequency string
     pub fn frequency_str(&self) -> &'static str {
         match self.frequency_index {
             0 => "weekly",
@@ -117,14 +105,17 @@ impl NewReportState {
         }
     }
 
+    /// Move to the next field
     pub fn next_field(&mut self) {
         self.current_field = self.current_field.next();
     }
 
+    /// Move to the previous field
     pub fn prev_field(&mut self) {
         self.current_field = self.current_field.prev();
     }
 
+    /// Handle left arrow key
     pub fn handle_left(&mut self) {
         match self.current_field {
             NewReportField::ReportType => {
@@ -148,6 +139,7 @@ impl NewReportState {
         }
     }
 
+    /// Handle right arrow key
     pub fn handle_right(&mut self) {
         match self.current_field {
             NewReportField::ReportType => {
@@ -171,6 +163,7 @@ impl NewReportState {
         }
     }
 
+    /// Handle character input
     pub fn handle_char(&mut self, c: char) {
         match self.current_field {
             NewReportField::Name => self.name.push(c),
@@ -179,6 +172,7 @@ impl NewReportState {
         }
     }
 
+    /// Handle backspace
     pub fn handle_backspace(&mut self) {
         match self.current_field {
             NewReportField::Name => {
@@ -191,6 +185,7 @@ impl NewReportState {
         }
     }
 
+    /// Check if the form is valid for submission
     pub fn is_valid(&self) -> bool {
         !self.name.trim().is_empty() && !self.title.trim().is_empty()
     }
@@ -202,13 +197,14 @@ pub struct NewReportModal<'a> {
 }
 
 impl<'a> NewReportModal<'a> {
+    /// Create a new modal with the given state
     pub fn new(state: &'a NewReportState) -> Self {
         Self { state }
     }
 
+    /// Render the modal
     pub fn render(&self, frame: &mut Frame, area: Rect) {
-        // Modal height: all fields single-line (6 rows + margins)
-        let modal_area = render_modal(frame, area, 76, 16);
+        let modal_area = super::render_modal(frame, area, 76, 16);
 
         let block = focused_block("Recruit New Report");
         let inner = block.inner(modal_area);
@@ -243,22 +239,25 @@ impl<'a> NewReportModal<'a> {
             .margin(1)
             .split(area);
 
-        // Report Type row
         self.render_type_row(frame, chunks[0]);
-
-        // Name row
-        self.render_name_row(frame, chunks[1]);
-
-        // Title row
-        self.render_title_row(frame, chunks[2]);
-
-        // Level row
+        self.render_text_input_row(
+            frame,
+            chunks[1],
+            "Name",
+            &self.state.name,
+            "e.g. Alex Chen",
+            NewReportField::Name,
+        );
+        self.render_text_input_row(
+            frame,
+            chunks[2],
+            "Title",
+            &self.state.title,
+            "e.g. Software Engineer",
+            NewReportField::Title,
+        );
         self.render_level_row(frame, chunks[3]);
-
-        // Frequency row
         self.render_frequency_row(frame, chunks[4]);
-
-        // Help row
         self.render_help(frame, chunks[5]);
     }
 
@@ -266,31 +265,13 @@ impl<'a> NewReportModal<'a> {
         let is_active = self.state.current_field == NewReportField::ReportType;
         let is_manager = self.state.report_type.is_manager();
 
-        // Focus indicator
         let focus = if is_active { "▸ " } else { "  " };
         let focus_style = Style::default().fg(COLOR_PRIMARY);
 
-        // IC option styling
         let ic_selected = !is_manager;
-        let ic_style = if ic_selected {
-            Style::default()
-                .fg(COLOR_SECONDARY)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            style_muted()
-        };
+        let ic_style = selection_style(ic_selected);
+        let mgr_style = selection_style(is_manager);
 
-        // Manager option styling
-        let mgr_selected = is_manager;
-        let mgr_style = if mgr_selected {
-            Style::default()
-                .fg(COLOR_SECONDARY)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            style_muted()
-        };
-
-        // Arrow styling - bright when focused
         let arrow_style = if is_active {
             Style::default()
                 .fg(COLOR_PRIMARY)
@@ -299,11 +280,10 @@ impl<'a> NewReportModal<'a> {
             style_muted()
         };
 
-        // Selection brackets
         let ic_l = if ic_selected { "[" } else { " " };
         let ic_r = if ic_selected { "]" } else { " " };
-        let mgr_l = if mgr_selected { "[" } else { " " };
-        let mgr_r = if mgr_selected { "]" } else { " " };
+        let mgr_l = if is_manager { "[" } else { " " };
+        let mgr_r = if is_manager { "]" } else { " " };
 
         let mut spans = vec![
             Span::styled(focus, focus_style),
@@ -317,7 +297,6 @@ impl<'a> NewReportModal<'a> {
             Span::styled(mgr_r, mgr_style),
         ];
 
-        // Show arrows hint when focused
         if is_active {
             spans.push(Span::styled(
                 "  ◀▶",
@@ -328,70 +307,46 @@ impl<'a> NewReportModal<'a> {
         }
 
         let line = Line::from(spans);
-        let para = Paragraph::new(line);
-        frame.render_widget(para, area);
+        frame.render_widget(Paragraph::new(line), area);
     }
 
-    fn render_name_row(&self, frame: &mut Frame, area: Rect) {
-        let is_active = self.state.current_field == NewReportField::Name;
+    fn render_text_input_row(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        label: &str,
+        value: &str,
+        hint: &str,
+        field: NewReportField,
+    ) {
+        let is_active = self.state.current_field == field;
         let style = if is_active {
             Style::default().fg(COLOR_SECONDARY)
         } else {
             Style::default()
         };
 
-        // Focus indicator
         let focus = if is_active { "▸ " } else { "  " };
         let focus_style = Style::default().fg(COLOR_PRIMARY);
-
         let cursor = if is_active { "█" } else { "" };
-        let hint = if self.state.name.is_empty() && is_active {
-            "e.g. Alex Chen"
+        let display_hint = if value.is_empty() && is_active {
+            hint
         } else {
             ""
         };
 
-        let line = Line::from(vec![
-            Span::styled(focus, focus_style),
-            Span::styled("Name:  ", style_header()),
-            Span::styled(&self.state.name, style),
-            Span::styled(cursor, Style::default().fg(COLOR_PRIMARY)),
-            Span::styled(hint, style_muted()),
-        ]);
-
-        let para = Paragraph::new(line);
-        frame.render_widget(para, area);
-    }
-
-    fn render_title_row(&self, frame: &mut Frame, area: Rect) {
-        let is_active = self.state.current_field == NewReportField::Title;
-        let style = if is_active {
-            Style::default().fg(COLOR_SECONDARY)
-        } else {
-            Style::default()
-        };
-
-        // Focus indicator
-        let focus = if is_active { "▸ " } else { "  " };
-        let focus_style = Style::default().fg(COLOR_PRIMARY);
-
-        let cursor = if is_active { "█" } else { "" };
-        let hint = if self.state.title.is_empty() && is_active {
-            "e.g. Software Engineer"
-        } else {
-            ""
-        };
+        // Pad label to 6 characters for alignment
+        let padded_label = format!("{:6} ", label);
 
         let line = Line::from(vec![
             Span::styled(focus, focus_style),
-            Span::styled("Title: ", style_header()),
-            Span::styled(&self.state.title, style),
+            Span::styled(padded_label, style_header()),
+            Span::styled(value, style),
             Span::styled(cursor, Style::default().fg(COLOR_PRIMARY)),
-            Span::styled(hint, style_muted()),
+            Span::styled(display_hint, style_muted()),
         ]);
 
-        let para = Paragraph::new(line);
-        frame.render_widget(para, area);
+        frame.render_widget(Paragraph::new(line), area);
     }
 
     fn render_level_row(&self, frame: &mut Frame, area: Rect) {
@@ -402,7 +357,6 @@ impl<'a> NewReportModal<'a> {
             "P"
         };
 
-        // Focus indicator
         let focus = if is_active { "▸ " } else { "  " };
         let focus_style = Style::default().fg(COLOR_PRIMARY);
 
@@ -414,14 +368,7 @@ impl<'a> NewReportModal<'a> {
         for i in 0..5 {
             let is_selected = i == self.state.level_index;
             let level_str = format!("{}{}", prefix, i + 1);
-
-            let style = if is_selected {
-                Style::default()
-                    .fg(COLOR_SECONDARY)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                style_muted()
-            };
+            let style = selection_style(is_selected);
 
             let bracket_l = if is_selected { "[" } else { " " };
             let bracket_r = if is_selected { "]" } else { " " };
@@ -431,7 +378,6 @@ impl<'a> NewReportModal<'a> {
             spans.push(Span::styled(bracket_r, style));
         }
 
-        // Show arrows hint when focused
         if is_active {
             spans.push(Span::styled(
                 "  ◀▶",
@@ -442,15 +388,13 @@ impl<'a> NewReportModal<'a> {
         }
 
         let line = Line::from(spans);
-        let para = Paragraph::new(line);
-        frame.render_widget(para, area);
+        frame.render_widget(Paragraph::new(line), area);
     }
 
     fn render_frequency_row(&self, frame: &mut Frame, area: Rect) {
         let is_active = self.state.current_field == NewReportField::Frequency;
         let frequencies = ["Weekly", "Biweekly", "Monthly"];
 
-        // Focus indicator
         let focus = if is_active { "▸ " } else { "  " };
         let focus_style = Style::default().fg(COLOR_PRIMARY);
 
@@ -461,14 +405,7 @@ impl<'a> NewReportModal<'a> {
 
         for (i, freq) in frequencies.iter().enumerate() {
             let is_selected = i == self.state.frequency_index;
-
-            let style = if is_selected {
-                Style::default()
-                    .fg(COLOR_SECONDARY)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                style_muted()
-            };
+            let style = selection_style(is_selected);
 
             let bracket_l = if is_selected { "[" } else { " " };
             let bracket_r = if is_selected { "]" } else { " " };
@@ -479,7 +416,6 @@ impl<'a> NewReportModal<'a> {
             spans.push(Span::raw(" "));
         }
 
-        // Show arrows hint when focused
         if is_active {
             spans.push(Span::styled(
                 " ◀▶",
@@ -490,12 +426,10 @@ impl<'a> NewReportModal<'a> {
         }
 
         let line = Line::from(spans);
-        let para = Paragraph::new(line);
-        frame.render_widget(para, area);
+        frame.render_widget(Paragraph::new(line), area);
     }
 
     fn render_help(&self, frame: &mut Frame, area: Rect) {
-        // Compact help text - single spaces between items
         let help = Line::from(vec![
             Span::styled("Tab/↑↓", style_header()),
             Span::raw(" Field "),
@@ -507,12 +441,10 @@ impl<'a> NewReportModal<'a> {
             Span::raw(" Cancel"),
         ]);
 
-        let para = Paragraph::new(help);
-        frame.render_widget(para, area);
+        frame.render_widget(Paragraph::new(help), area);
     }
 
     fn render_preview(&self, frame: &mut Frame, area: Rect) {
-        // Create a preview card showing what the avatar will look like
         let block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
@@ -539,28 +471,24 @@ impl<'a> NewReportModal<'a> {
         let level = self.state.level_str();
         let is_manager = self.state.report_type.is_manager();
 
-        // Simplified avatar frames
-        // Get avatar frame pieces based on level and type
-        // Matches sprites.rs frame progression
         let (top, headband, face, bot) = if is_manager {
             match self.state.level_index {
-                0 => ("╭─────╮", "│──◇──│", "│ •_• │", "╰─────╯"), // M1
-                1 => ("┌─────┐", "│══◆══│", "│ •_• │", "└─────┘"), // M2
-                2 => ("╔═════╗", "║══★══║", "║ •_• ║", "╚═════╝"), // M3
-                3 => ("╔═════╗", "║═★═★═║", "║ •_• ║", "╚═════╝"), // M4
-                _ => ("╔═════╗", "║★═★═★║", "║ •_• ║", "╚═════╝"), // M5
+                0 => ("╭─────╮", "│──◇──│", "│ •_• │", "╰─────╯"),
+                1 => ("┌─────┐", "│══◆══│", "│ •_• │", "└─────┘"),
+                2 => ("╔═════╗", "║══★══║", "║ •_• ║", "╚═════╝"),
+                3 => ("╔═════╗", "║═★═★═║", "║ •_• ║", "╚═════╝"),
+                _ => ("╔═════╗", "║★═★═★║", "║ •_• ║", "╚═════╝"),
             }
         } else {
             match self.state.level_index {
-                0 => ("╭─────╮", "", "│ •_• │", "╰─────╯"), // P1
-                1 => ("┌─────┐", "", "│ •_• │", "└─────┘"), // P2
-                2 => ("╔═════╗", "", "║ •_• ║", "╚═════╝"), // P3
-                3 => ("╔══★══╗", "", "║ •_• ║", "╚═════╝"), // P4
-                _ => ("╔═★═★═╗", "", "║ •_• ║", "╚═════╝"), // P5
+                0 => ("╭─────╮", "", "│ •_• │", "╰─────╯"),
+                1 => ("┌─────┐", "", "│ •_• │", "└─────┘"),
+                2 => ("╔═════╗", "", "║ •_• ║", "╚═════╝"),
+                3 => ("╔══★══╗", "", "║ •_• ║", "╚═════╝"),
+                _ => ("╔═★═★═╗", "", "║ •_• ║", "╚═════╝"),
             }
         };
 
-        // Truncate name for preview
         let display_name: String = self.state.name.chars().take(12).collect();
 
         let mut lines = vec![
@@ -568,7 +496,6 @@ impl<'a> NewReportModal<'a> {
             Line::from(Span::styled(top, Style::default().fg(COLOR_PRIMARY))),
         ];
 
-        // Add headband for managers
         if is_manager && !headband.is_empty() {
             lines.push(Line::from(Span::styled(
                 headband,
@@ -576,19 +503,14 @@ impl<'a> NewReportModal<'a> {
             )));
         }
 
-        // Add face
         lines.push(Line::from(Span::styled(
             face,
             Style::default().fg(COLOR_PRIMARY),
         )));
-
-        // Add bottom border
         lines.push(Line::from(Span::styled(
             bot,
             Style::default().fg(COLOR_PRIMARY),
         )));
-
-        // Add name
         lines.push(Line::from(Span::styled(
             display_name,
             Style::default()
@@ -597,158 +519,6 @@ impl<'a> NewReportModal<'a> {
         )));
 
         let para = Paragraph::new(lines).alignment(Alignment::Center);
-        frame.render_widget(para, inner);
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// LEGACY SUPPORT - Keep old struct for backward compatibility during transition
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// Legacy new report modal (deprecated, use NewReportModal with NewReportState)
-pub struct LegacyNewReportModal<'a> {
-    fields: &'a [String],
-    current_field: usize,
-}
-
-impl<'a> LegacyNewReportModal<'a> {
-    pub fn new(fields: &'a [String], current_field: usize) -> Self {
-        Self {
-            fields,
-            current_field,
-        }
-    }
-
-    pub fn render(&self, frame: &mut Frame, area: Rect) {
-        let modal_area = render_modal(frame, area, 50, 14);
-
-        let block = focused_block("New Report");
-        let inner = block.inner(modal_area);
-        frame.render_widget(block, modal_area);
-
-        let field_labels = ["Name:", "Level:", "Meeting Frequency:"];
-        let field_hints = ["e.g. Alex Chen", "P1-P5", "weekly/biweekly/monthly"];
-
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(3),
-                Constraint::Length(3),
-                Constraint::Length(3),
-                Constraint::Length(2),
-            ])
-            .margin(1)
-            .split(inner);
-
-        for (i, (label, hint)) in field_labels.iter().zip(field_hints.iter()).enumerate() {
-            let value = self.fields.get(i).map(|s| s.as_str()).unwrap_or("");
-            let is_active = i == self.current_field;
-
-            let style = if is_active {
-                Style::default().fg(COLOR_SECONDARY)
-            } else {
-                Style::default()
-            };
-
-            let cursor = if is_active { "█" } else { "" };
-
-            let lines = vec![
-                Line::from(Span::styled(*label, style_header())),
-                Line::from(vec![
-                    Span::styled(value, style),
-                    Span::styled(cursor, Style::default().fg(COLOR_PRIMARY)),
-                    if value.is_empty() {
-                        Span::styled(format!(" {}", hint), style_muted())
-                    } else {
-                        Span::raw("")
-                    },
-                ]),
-            ];
-
-            let para = Paragraph::new(lines);
-            frame.render_widget(para, chunks[i]);
-        }
-
-        // Help text
-        let help = Line::from(vec![
-            Span::styled("Tab/Enter", style_header()),
-            Span::raw(" Next field  "),
-            Span::styled("Esc", style_header()),
-            Span::raw(" Cancel"),
-        ]);
-        let help_para = Paragraph::new(help);
-        frame.render_widget(help_para, chunks[3]);
-    }
-}
-
-/// Help modal
-pub struct HelpModal;
-
-impl HelpModal {
-    pub fn render(frame: &mut Frame, area: Rect) {
-        let modal_area = render_modal(frame, area, 60, 20);
-
-        let block = focused_block("Help");
-        let inner = block.inner(modal_area);
-        frame.render_widget(block, modal_area);
-
-        let sections = vec![
-            (
-                "Party View",
-                vec![
-                    ("h/l or ←/→", "Select party member"),
-                    ("j/k or ↑/↓", "Navigate grid"),
-                    ("Enter/Space", "View member details"),
-                    ("n", "Recruit new member"),
-                    ("g/G", "Jump to first/last"),
-                    ("r", "Refresh data"),
-                    ("q", "Quit"),
-                ],
-            ),
-            (
-                "Member Details",
-                vec![
-                    ("n", "New 1-on-1 meeting"),
-                    ("m", "Record mood observation"),
-                    ("Enter", "View entry notes"),
-                    ("Del", "Delete entry"),
-                    ("Esc", "Back to party view"),
-                ],
-            ),
-            (
-                "Meeting Notes",
-                vec![
-                    ("←↑↓→", "Move cursor"),
-                    ("Home/End", "Start/end of line"),
-                    ("Del", "Delete character"),
-                    ("Ctrl+S", "Save note"),
-                    ("F1-F5", "Set mood (1-5)"),
-                    ("Esc", "Back"),
-                ],
-            ),
-        ];
-
-        let mut lines = Vec::new();
-        for (section, bindings) in sections {
-            lines.push(Line::from(Span::styled(section, style_header())));
-            for (key, desc) in bindings {
-                lines.push(Line::from(vec![
-                    Span::styled(
-                        format!("  {:12}", key),
-                        Style::default().fg(COLOR_SECONDARY),
-                    ),
-                    Span::raw(desc),
-                ]));
-            }
-            lines.push(Line::from(""));
-        }
-
-        lines.push(Line::from(Span::styled(
-            "Press ? or Esc to close",
-            style_muted(),
-        )));
-
-        let para = Paragraph::new(lines);
         frame.render_widget(para, inner);
     }
 }

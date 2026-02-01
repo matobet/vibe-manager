@@ -16,6 +16,29 @@ use crate::theme::{
 
 use super::AvatarGrid;
 
+/// Render the VIBE MANAGER title bar
+///
+/// Renders a centered title with RPG-style double borders and sword decorations.
+pub fn render_vibe_manager_title(frame: &mut Frame, area: Rect) {
+    let title_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Double)
+        .border_style(Style::default().fg(COLOR_PRIMARY));
+
+    let title_text = vec![Line::from(vec![
+        Span::styled("⚔ ", Style::default().fg(COLOR_SECONDARY)),
+        Span::styled("VIBE MANAGER", style_title()),
+        Span::styled(" ⚔", Style::default().fg(COLOR_SECONDARY)),
+    ])];
+
+    let inner = title_block.inner(area);
+    frame.render_widget(title_block, area);
+    frame.render_widget(
+        Paragraph::new(title_text).alignment(Alignment::Center),
+        inner,
+    );
+}
+
 pub struct Dashboard<'a> {
     summaries: &'a [ReportSummary],
     workspace_summary: &'a WorkspaceSummary,
@@ -52,23 +75,7 @@ impl<'a> Dashboard<'a> {
     }
 
     fn render_title(&self, frame: &mut Frame, area: Rect) {
-        let title_block = Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Double)
-            .border_style(Style::default().fg(COLOR_PRIMARY))
-            .title("═══════════════════════════════════════")
-            .title_alignment(Alignment::Center);
-
-        let title_text = vec![Line::from(vec![
-            Span::styled("⚔ ", Style::default().fg(COLOR_SECONDARY)),
-            Span::styled("VIBE MANAGER", style_title()),
-            Span::styled(" ⚔", Style::default().fg(COLOR_SECONDARY)),
-        ])];
-
-        let inner = title_block.inner(area);
-        frame.render_widget(title_block, area);
-        let para = Paragraph::new(title_text).alignment(Alignment::Center);
-        frame.render_widget(para, inner);
+        render_vibe_manager_title(frame, area);
     }
 
     fn render_stats(&self, frame: &mut Frame, area: Rect) {
@@ -152,21 +159,7 @@ pub fn render_empty_state(frame: &mut Frame, area: Rect) {
         .split(area);
 
     // Title
-    let title_block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Double)
-        .border_style(Style::default().fg(COLOR_PRIMARY));
-
-    let title_text = vec![Line::from(vec![
-        Span::styled("⚔ ", Style::default().fg(COLOR_SECONDARY)),
-        Span::styled("VIBE MANAGER", style_title()),
-        Span::styled(" ⚔", Style::default().fg(COLOR_SECONDARY)),
-    ])];
-
-    let inner = title_block.inner(chunks[0]);
-    frame.render_widget(title_block, chunks[0]);
-    let para = Paragraph::new(title_text).alignment(Alignment::Center);
-    frame.render_widget(para, inner);
+    render_vibe_manager_title(frame, chunks[0]);
 
     // Empty party message with kaomoji style
     let empty_art = vec![

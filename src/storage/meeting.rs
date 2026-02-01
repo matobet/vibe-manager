@@ -1,3 +1,11 @@
+//! Journal entry storage operations
+//!
+//! Handles loading and saving journal entries (meetings and mood observations).
+//!
+//! Entries can be stored in two locations:
+//! - Legacy: directly in the report directory (`alex-chen/2026-01-15.md`)
+//! - New: in the `journal/` subdirectory (`alex-chen/journal/2026-01-15T143000.md`)
+
 use std::fs;
 use std::path::Path;
 

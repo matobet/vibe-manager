@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use chrono::NaiveDate;
 use vibe_manager::model::ReportType;
 use vibe_manager::storage::{
-    has_team_dir, is_workspace, list_report_dirs, list_team_member_dirs, load_entries,
-    load_meetings, load_report, load_report_with_manager, load_workspace,
+    has_team_dir, is_workspace, list_report_dirs, list_team_member_dirs, load_entries, load_report,
+    load_report_with_manager, load_workspace,
 };
 
 fn fixtures_path() -> PathBuf {
@@ -120,7 +120,7 @@ mod meeting_tests {
 
     #[test]
     fn test_load_entries_sorted_by_timestamp() {
-        let entries = load_meetings(&fixtures_path().join("alex-chen")).unwrap();
+        let entries = load_entries(&fixtures_path().join("alex-chen")).unwrap();
 
         // Should have meetings + mood observations
         assert!(entries.len() >= 2);
@@ -131,8 +131,8 @@ mod meeting_tests {
     }
 
     #[test]
-    fn test_load_meetings_only() {
-        let entries = load_meetings(&fixtures_path().join("alex-chen")).unwrap();
+    fn test_load_entries_only() {
+        let entries = load_entries(&fixtures_path().join("alex-chen")).unwrap();
         let meetings: Vec<_> = entries.iter().filter(|e| e.is_meeting()).collect();
 
         // Should have at least the 2 original meetings
@@ -145,7 +145,7 @@ mod meeting_tests {
 
     #[test]
     fn test_load_meeting_mood() {
-        let entries = load_meetings(&fixtures_path().join("alex-chen")).unwrap();
+        let entries = load_entries(&fixtures_path().join("alex-chen")).unwrap();
         let meetings: Vec<_> = entries.iter().filter(|e| e.is_meeting()).collect();
 
         assert_eq!(meetings[0].mood(), Some(3)); // Jan 8
@@ -154,7 +154,7 @@ mod meeting_tests {
 
     #[test]
     fn test_load_meeting_content() {
-        let entries = load_meetings(&fixtures_path().join("alex-chen")).unwrap();
+        let entries = load_entries(&fixtures_path().join("alex-chen")).unwrap();
         let meetings: Vec<_> = entries.iter().filter(|e| e.is_meeting()).collect();
 
         assert!(meetings[1].content.contains("Career goals"));
@@ -163,7 +163,7 @@ mod meeting_tests {
 
     #[test]
     fn test_load_mood_observations() {
-        let entries = load_meetings(&fixtures_path().join("alex-chen")).unwrap();
+        let entries = load_entries(&fixtures_path().join("alex-chen")).unwrap();
         let observations: Vec<_> = entries.iter().filter(|e| !e.is_meeting()).collect();
 
         // Should have mood observations (pure mood entries without content)
@@ -176,7 +176,7 @@ mod meeting_tests {
 
     #[test]
     fn test_load_multiple_entries() {
-        let entries = load_meetings(&fixtures_path().join("jordan-lee")).unwrap();
+        let entries = load_entries(&fixtures_path().join("jordan-lee")).unwrap();
         let meetings: Vec<_> = entries.iter().filter(|e| e.is_meeting()).collect();
 
         // Should have at least 3 meetings
@@ -186,7 +186,7 @@ mod meeting_tests {
     #[test]
     fn test_legacy_filename_format() {
         // Legacy files (YYYY-MM-DD.md) should still load
-        let entries = load_meetings(&fixtures_path().join("alex-chen")).unwrap();
+        let entries = load_entries(&fixtures_path().join("alex-chen")).unwrap();
         let legacy: Vec<_> = entries.iter().filter(|e| !e.has_time()).collect();
 
         // Should have legacy date-only entries

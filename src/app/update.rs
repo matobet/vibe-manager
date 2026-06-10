@@ -7,7 +7,6 @@ use anyhow::Result;
 
 use super::{App, Effect, Msg, ViewMode};
 use crate::model::{compute_report_summary, compute_workspace_summary, ManagerInfo};
-use crate::storage;
 
 impl App {
     /// Process a message and update state (TEA update function)
@@ -93,7 +92,12 @@ impl App {
             Msg::NewMeeting => {
                 if let Some(report_idx) = self.selected_report_index {
                     let report = &self.reports[report_idx];
-                    match storage::create_meeting(&report.path, None) {
+                    match self
+                        .repo
+                        .report(&report.slug)
+                        .entries()
+                        .create_meeting(None)
+                    {
                         Ok(meeting) => {
                             self.editor_content = meeting.content.clone();
                             self.editor_mood = None;
@@ -133,9 +137,10 @@ impl App {
                 if let (Some(report_idx), Some(meet_idx)) =
                     (self.selected_report_index, self.selected_entry_index)
                 {
+                    let report = &self.reports[report_idx];
                     let meeting = &mut self.entries_by_report[report_idx][meet_idx];
                     meeting.frontmatter.mood = Some(mood);
-                    if let Err(e) = storage::save_entry(meeting) {
+                    if let Err(e) = self.repo.report(&report.slug).entries().save(meeting) {
                         self.set_status(format!("Error saving mood: {}", e));
                     } else {
                         self.set_status("Mood updated");
@@ -394,7 +399,7 @@ impl App {
             "IC"
         };
 
-        match storage::create_report(&self.workspace.path, &name, profile) {
+        match self.repo.create_report(&name, profile) {
             Ok(_) => {
                 self.load_data()?;
                 self.set_status(format!("Recruited {} ({})", name, type_label));
@@ -411,8 +416,7 @@ impl App {
     fn handle_save_entry(&mut self) {
         if let Some(report_idx) = self.selected_report_index {
             let report = &self.reports[report_idx];
-            match storage::create_entry(
-                &report.path,
+            match self.repo.report(&report.slug).entries().create_observation(
                 self.pending_entry_mood,
                 Some(self.pending_entry_context),
                 self.pending_entry_notes.clone(),

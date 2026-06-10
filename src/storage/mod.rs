@@ -1,25 +1,11 @@
 //! Storage layer for Vibe Manager
 //!
-//! Handles loading and saving data to the filesystem using markdown files
+//! Provides repository-based access to workspace data stored as markdown files
 //! with YAML frontmatter.
 
-pub mod meeting;
-pub mod profile;
-pub mod workspace;
+pub mod repo;
 
-// Journal entry functions
-pub use meeting::{create_entry, create_meeting, load_entries, save_entry, update_entry_mood};
-
-// Report functions
-pub use profile::{
-    archive_report, create_report, load_report, load_report_with_manager, save_report,
-};
-
-// Workspace functions
-pub use workspace::{
-    has_team_dir, init_workspace, is_workspace, list_report_dirs, list_team_member_dirs,
-    load_workspace,
-};
+pub use repo::{EntryRepository, ReportRepository, WorkspaceRepository};
 
 use thiserror::Error;
 
@@ -57,12 +43,6 @@ pub fn parse_frontmatter(content: &str) -> (Option<&str>, &str) {
     } else {
         (None, content)
     }
-}
-
-/// Generate frontmatter string from serializable data
-pub fn generate_frontmatter<T: serde::Serialize>(data: &T) -> StorageResult<String> {
-    let yaml = serde_yaml::to_string(data)?;
-    Ok(format!("---\n{}---\n\n", yaml))
 }
 
 #[cfg(test)]

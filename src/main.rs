@@ -17,7 +17,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 
 use vibe_manager::app::{self, handle_key_event, poll_event, App, Effect, ViewMode};
 use vibe_manager::editor;
-use vibe_manager::storage;
+use vibe_manager::storage::{self, WorkspaceRepository};
 use vibe_manager::views::{render_dashboard_view, render_detail_view, render_viewer_view};
 
 #[derive(Parser)]
@@ -65,12 +65,9 @@ fn init_workspace(path: &PathBuf) -> Result<()> {
         std::env::current_dir()?.join(path)
     };
 
-    match storage::init_workspace(&abs_path) {
-        Ok(workspace) => {
-            println!(
-                "✓ Initialized Vibe Manager workspace at {:?}",
-                workspace.path
-            );
+    match WorkspaceRepository::init(&abs_path) {
+        Ok(repo) => {
+            println!("✓ Initialized Vibe Manager workspace at {:?}", repo.path());
             println!();
             println!("Next steps:");
             println!("  1. Run 'vibe-manager {:?}' to open the TUI", path);
@@ -94,7 +91,7 @@ fn run_tui(path: &PathBuf) -> Result<()> {
     };
 
     // Check if workspace exists
-    if !storage::is_workspace(&abs_path) {
+    if !WorkspaceRepository::is_valid(&abs_path) {
         eprintln!("Error: Not a Vibe Manager workspace");
         eprintln!();
         eprintln!(

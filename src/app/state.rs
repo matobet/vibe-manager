@@ -12,14 +12,16 @@ use crate::components::modal::NewReportState;
 use crate::model::{
     compute_report_summary, compute_workspace_summary, Context, JournalEntry, WorkspaceSummary,
 };
-use crate::storage;
+use crate::storage::WorkspaceRepository;
 
 impl App {
     /// Create new application from workspace path
     pub fn new(workspace_path: PathBuf) -> Result<Self> {
-        let workspace = storage::load_workspace(&workspace_path)?;
+        let repo = WorkspaceRepository::open(&workspace_path)?;
+        let workspace = repo.load()?;
 
         let mut app = App {
+            repo,
             workspace,
             reports: Vec::new(),
             entries_by_report: Vec::new(),
@@ -52,31 +54,28 @@ impl App {
 
     /// Load all data from workspace
     pub fn load_data(&mut self) -> Result<()> {
-        let report_dirs = storage::list_report_dirs(&self.workspace)?;
+        let report_repos = self.repo.list_reports()?;
 
         self.reports.clear();
         self.entries_by_report.clear();
         self.summaries.clear();
 
         // Collect all report data
-        let mut all_data: Vec<_> = report_dirs
+        let mut all_data: Vec<_> = report_repos
             .into_iter()
-            .filter_map(|dir| {
-                let mut report = storage::load_report(&dir).ok()?;
+            .filter_map(|report_repo| {
+                let mut report = report_repo.load().ok()?;
 
                 // Load team members for managers
-                if storage::has_team_dir(&dir) {
-                    let team_dirs = storage::list_team_member_dirs(&dir).unwrap_or_default();
-                    for team_dir in team_dirs {
-                        if let Ok(team_member) =
-                            storage::load_report_with_manager(&team_dir, &report.slug)
-                        {
+                if report_repo.has_team() {
+                    for team_repo in report_repo.list_team_members().unwrap_or_default() {
+                        if let Ok(team_member) = team_repo.load() {
                             report.team.push(team_member);
                         }
                     }
                 }
 
-                let entries = storage::load_entries(&dir).unwrap_or_default();
+                let entries = report_repo.entries().list().unwrap_or_default();
                 let summary = compute_report_summary(
                     &report,
                     &entries,
@@ -135,11 +134,11 @@ impl App {
     ///
     /// Returns Ok(()) on success, sets status message on error
     pub fn delete_entry(&mut self, report_idx: usize, entry_idx: usize) -> Result<()> {
+        let report = &self.reports[report_idx];
         let entry = &self.entries_by_report[report_idx][entry_idx];
-        let path = entry.path.clone();
 
-        // Delete the file
-        std::fs::remove_file(&path)?;
+        // Delete the file via repository
+        self.repo.report(&report.slug).entries().delete(entry)?;
 
         // Remove from in-memory list
         self.entries_by_report[report_idx].remove(entry_idx);

@@ -4,13 +4,14 @@ use std::path::PathBuf;
 
 use chrono::NaiveDate;
 use vibe_manager::model::ReportType;
-use vibe_manager::storage::{
-    has_team_dir, is_workspace, list_report_dirs, list_team_member_dirs, load_entries, load_report,
-    load_report_with_manager, load_workspace,
-};
+use vibe_manager::storage::{ReportRepository, WorkspaceRepository};
 
 fn fixtures_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
+}
+
+fn fixtures_repo() -> WorkspaceRepository {
+    WorkspaceRepository::open(fixtures_path()).unwrap()
 }
 
 #[cfg(test)]
@@ -19,13 +20,16 @@ mod workspace_tests {
 
     #[test]
     fn test_is_workspace() {
-        assert!(is_workspace(&fixtures_path()));
-        assert!(!is_workspace(&fixtures_path().join("alex-chen")));
+        assert!(WorkspaceRepository::is_valid(&fixtures_path()));
+        assert!(!WorkspaceRepository::is_valid(
+            &fixtures_path().join("alex-chen")
+        ));
     }
 
     #[test]
     fn test_load_workspace_config() {
-        let workspace = load_workspace(&fixtures_path()).unwrap();
+        let repo = fixtures_repo();
+        let workspace = repo.load().unwrap();
 
         assert_eq!(workspace.config.version, 1);
         assert_eq!(
@@ -37,17 +41,13 @@ mod workspace_tests {
 
     #[test]
     fn test_list_report_dirs() {
-        let workspace = load_workspace(&fixtures_path()).unwrap();
-        let dirs = list_report_dirs(&workspace).unwrap();
+        let repo = fixtures_repo();
+        let reports = repo.list_reports().unwrap();
 
         // Should find all top-level reports with _profile.md
-        assert_eq!(dirs.len(), 5);
+        assert_eq!(reports.len(), 5);
 
-        let names: Vec<_> = dirs
-            .iter()
-            .filter_map(|p| p.file_name())
-            .filter_map(|n| n.to_str())
-            .collect();
+        let names: Vec<_> = reports.iter().map(|r| r.slug()).collect();
 
         assert!(names.contains(&"alex-chen"));
         assert!(names.contains(&"jordan-lee"));
@@ -63,7 +63,8 @@ mod report_tests {
 
     #[test]
     fn test_load_report_profile() {
-        let report = load_report(&fixtures_path().join("alex-chen")).unwrap();
+        let repo = fixtures_repo();
+        let report = repo.report("alex-chen").load().unwrap();
 
         assert_eq!(report.slug, "alex-chen");
         assert_eq!(report.profile.name, "Alex Chen");
@@ -75,7 +76,8 @@ mod report_tests {
 
     #[test]
     fn test_load_report_personal_info() {
-        let report = load_report(&fixtures_path().join("alex-chen")).unwrap();
+        let repo = fixtures_repo();
+        let report = repo.report("alex-chen").load().unwrap();
 
         assert_eq!(report.profile.partner, Some("Sarah".to_string()));
         assert_eq!(report.profile.children, vec!["Emma", "Jack"]);
@@ -87,7 +89,8 @@ mod report_tests {
 
     #[test]
     fn test_load_report_notes_content() {
-        let report = load_report(&fixtures_path().join("alex-chen")).unwrap();
+        let repo = fixtures_repo();
+        let report = repo.report("alex-chen").load().unwrap();
 
         assert!(report.notes_content.contains("# Alex Chen"));
         assert!(report.notes_content.contains("## Background"));
@@ -96,7 +99,8 @@ mod report_tests {
 
     #[test]
     fn test_load_report_with_minimal_profile() {
-        let report = load_report(&fixtures_path().join("jonas")).unwrap();
+        let repo = fixtures_repo();
+        let report = repo.report("jonas").load().unwrap();
 
         assert_eq!(report.profile.name, "Jonas");
         assert_eq!(report.profile.title, None);
@@ -106,8 +110,9 @@ mod report_tests {
 
     #[test]
     fn test_meeting_frequency_days() {
-        let alex = load_report(&fixtures_path().join("alex-chen")).unwrap();
-        let jordan = load_report(&fixtures_path().join("jordan-lee")).unwrap();
+        let repo = fixtures_repo();
+        let alex = repo.report("alex-chen").load().unwrap();
+        let jordan = repo.report("jordan-lee").load().unwrap();
 
         assert_eq!(alex.meeting_frequency_days(), 7); // weekly
         assert_eq!(jordan.meeting_frequency_days(), 14); // biweekly
@@ -120,7 +125,8 @@ mod meeting_tests {
 
     #[test]
     fn test_load_entries_sorted_by_timestamp() {
-        let entries = load_entries(&fixtures_path().join("alex-chen")).unwrap();
+        let repo = fixtures_repo();
+        let entries = repo.report("alex-chen").entries().list().unwrap();
 
         // Should have meetings + mood observations
         assert!(entries.len() >= 2);
@@ -132,7 +138,8 @@ mod meeting_tests {
 
     #[test]
     fn test_load_entries_only() {
-        let entries = load_entries(&fixtures_path().join("alex-chen")).unwrap();
+        let repo = fixtures_repo();
+        let entries = repo.report("alex-chen").entries().list().unwrap();
         let meetings: Vec<_> = entries.iter().filter(|e| e.is_meeting()).collect();
 
         // Should have at least the 2 original meetings
@@ -145,7 +152,8 @@ mod meeting_tests {
 
     #[test]
     fn test_load_meeting_mood() {
-        let entries = load_entries(&fixtures_path().join("alex-chen")).unwrap();
+        let repo = fixtures_repo();
+        let entries = repo.report("alex-chen").entries().list().unwrap();
         let meetings: Vec<_> = entries.iter().filter(|e| e.is_meeting()).collect();
 
         assert_eq!(meetings[0].mood(), Some(3)); // Jan 8
@@ -154,7 +162,8 @@ mod meeting_tests {
 
     #[test]
     fn test_load_meeting_content() {
-        let entries = load_entries(&fixtures_path().join("alex-chen")).unwrap();
+        let repo = fixtures_repo();
+        let entries = repo.report("alex-chen").entries().list().unwrap();
         let meetings: Vec<_> = entries.iter().filter(|e| e.is_meeting()).collect();
 
         assert!(meetings[1].content.contains("Career goals"));
@@ -163,7 +172,8 @@ mod meeting_tests {
 
     #[test]
     fn test_load_mood_observations() {
-        let entries = load_entries(&fixtures_path().join("alex-chen")).unwrap();
+        let repo = fixtures_repo();
+        let entries = repo.report("alex-chen").entries().list().unwrap();
         let observations: Vec<_> = entries.iter().filter(|e| !e.is_meeting()).collect();
 
         // Should have mood observations (pure mood entries without content)
@@ -176,7 +186,8 @@ mod meeting_tests {
 
     #[test]
     fn test_load_multiple_entries() {
-        let entries = load_entries(&fixtures_path().join("jordan-lee")).unwrap();
+        let repo = fixtures_repo();
+        let entries = repo.report("jordan-lee").entries().list().unwrap();
         let meetings: Vec<_> = entries.iter().filter(|e| e.is_meeting()).collect();
 
         // Should have at least 3 meetings
@@ -185,8 +196,9 @@ mod meeting_tests {
 
     #[test]
     fn test_legacy_filename_format() {
+        let repo = fixtures_repo();
         // Legacy files (YYYY-MM-DD.md) should still load
-        let entries = load_entries(&fixtures_path().join("alex-chen")).unwrap();
+        let entries = repo.report("alex-chen").entries().list().unwrap();
         let legacy: Vec<_> = entries.iter().filter(|e| !e.has_time()).collect();
 
         // Should have legacy date-only entries
@@ -204,7 +216,8 @@ mod manager_tests {
 
     #[test]
     fn test_load_manager_profile() {
-        let manager = load_report(&fixtures_path().join("chris-wong")).unwrap();
+        let repo = fixtures_repo();
+        let manager = repo.report("chris-wong").load().unwrap();
 
         assert_eq!(manager.slug, "chris-wong");
         assert_eq!(manager.profile.name, "Chris Wong");
@@ -218,21 +231,19 @@ mod manager_tests {
 
     #[test]
     fn test_manager_has_team_dir() {
-        assert!(has_team_dir(&fixtures_path().join("chris-wong")));
-        assert!(!has_team_dir(&fixtures_path().join("alex-chen")));
+        let repo = fixtures_repo();
+        assert!(repo.report("chris-wong").has_team());
+        assert!(!repo.report("alex-chen").has_team());
     }
 
     #[test]
     fn test_list_team_members() {
-        let dirs = list_team_member_dirs(&fixtures_path().join("chris-wong")).unwrap();
+        let repo = fixtures_repo();
+        let team = repo.report("chris-wong").list_team_members().unwrap();
 
-        assert_eq!(dirs.len(), 3);
+        assert_eq!(team.len(), 3);
 
-        let names: Vec<_> = dirs
-            .iter()
-            .filter_map(|p| p.file_name())
-            .filter_map(|n| n.to_str())
-            .collect();
+        let names: Vec<_> = team.iter().map(|r| r.slug()).collect();
 
         assert!(names.contains(&"morgan-smith"));
         assert!(names.contains(&"lee-kim"));
@@ -241,8 +252,9 @@ mod manager_tests {
 
     #[test]
     fn test_load_team_member_profile() {
-        let team_member =
-            load_report(&fixtures_path().join("chris-wong/team/robin-patel")).unwrap();
+        let team_member_repo =
+            ReportRepository::new(fixtures_path().join("chris-wong/team/robin-patel"), None);
+        let team_member = team_member_repo.load().unwrap();
 
         assert_eq!(team_member.slug, "robin-patel");
         assert_eq!(team_member.profile.name, "Robin Patel");
@@ -252,7 +264,8 @@ mod manager_tests {
 
     #[test]
     fn test_load_manager_journal_entries() {
-        let entries = load_entries(&fixtures_path().join("chris-wong")).unwrap();
+        let repo = fixtures_repo();
+        let entries = repo.report("chris-wong").entries().list().unwrap();
 
         // Manager should have 4 journal entries
         assert_eq!(entries.len(), 4);
@@ -267,7 +280,9 @@ mod manager_tests {
     #[test]
     fn test_load_skip_level_entries() {
         // Skip-level meetings are in team member's journal folder
-        let entries = load_entries(&fixtures_path().join("chris-wong/team/robin-patel")).unwrap();
+        let team_member_repo =
+            ReportRepository::new(fixtures_path().join("chris-wong/team/robin-patel"), None);
+        let entries = team_member_repo.entries().list().unwrap();
 
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].mood(), Some(5));
@@ -276,22 +291,26 @@ mod manager_tests {
 
     #[test]
     fn test_team_member_levels() {
-        let lee = load_report(&fixtures_path().join("chris-wong/team/lee-kim")).unwrap();
-        let morgan = load_report(&fixtures_path().join("chris-wong/team/morgan-smith")).unwrap();
-        let robin = load_report(&fixtures_path().join("chris-wong/team/robin-patel")).unwrap();
+        let repo = fixtures_repo();
+        let chris_repo = repo.report("chris-wong");
+        let team = chris_repo.list_team_members().unwrap();
 
-        assert_eq!(lee.profile.level, Some("P1".to_string()));
-        assert_eq!(morgan.profile.level, Some("P2".to_string()));
-        assert_eq!(robin.profile.level, Some("P3".to_string()));
+        // Find each team member by slug
+        let lee = team.iter().find(|r| r.slug() == "lee-kim").unwrap();
+        let morgan = team.iter().find(|r| r.slug() == "morgan-smith").unwrap();
+        let robin = team.iter().find(|r| r.slug() == "robin-patel").unwrap();
+
+        assert_eq!(lee.load().unwrap().profile.level, Some("P1".to_string()));
+        assert_eq!(morgan.load().unwrap().profile.level, Some("P2".to_string()));
+        assert_eq!(robin.load().unwrap().profile.level, Some("P3".to_string()));
     }
 
     #[test]
     fn test_load_report_with_manager_sets_manager_slug() {
-        let team_member = load_report_with_manager(
-            &fixtures_path().join("chris-wong/team/robin-patel"),
-            "chris-wong",
-        )
-        .unwrap();
+        let repo = fixtures_repo();
+        let team = repo.report("chris-wong").list_team_members().unwrap();
+        let robin = team.iter().find(|r| r.slug() == "robin-patel").unwrap();
+        let team_member = robin.load().unwrap();
 
         assert_eq!(team_member.slug, "robin-patel");
         assert_eq!(team_member.manager_slug, Some("chris-wong".to_string()));
@@ -299,32 +318,34 @@ mod manager_tests {
 
     #[test]
     fn test_is_second_level_returns_true_for_team_member() {
-        let team_member = load_report_with_manager(
-            &fixtures_path().join("chris-wong/team/robin-patel"),
-            "chris-wong",
-        )
-        .unwrap();
+        let repo = fixtures_repo();
+        let team = repo.report("chris-wong").list_team_members().unwrap();
+        let robin = team.iter().find(|r| r.slug() == "robin-patel").unwrap();
+        let team_member = robin.load().unwrap();
 
         assert!(team_member.is_second_level());
     }
 
     #[test]
     fn test_is_second_level_returns_false_for_direct_report() {
-        let direct_report = load_report(&fixtures_path().join("alex-chen")).unwrap();
+        let repo = fixtures_repo();
+        let direct_report = repo.report("alex-chen").load().unwrap();
 
         assert!(!direct_report.is_second_level());
     }
 
     #[test]
     fn test_list_team_members_empty_team_dir() {
-        let dirs = list_team_member_dirs(&fixtures_path().join("manager-minimal")).unwrap();
+        let repo = fixtures_repo();
+        let team = repo.report("manager-minimal").list_team_members().unwrap();
 
-        assert!(dirs.is_empty());
+        assert!(team.is_empty());
     }
 
     #[test]
     fn test_manager_without_manager_info() {
-        let manager = load_report(&fixtures_path().join("manager-minimal")).unwrap();
+        let repo = fixtures_repo();
+        let manager = repo.report("manager-minimal").load().unwrap();
 
         assert_eq!(manager.slug, "manager-minimal");
         assert_eq!(manager.profile.name, "Minimal Manager");
@@ -337,45 +358,39 @@ mod manager_tests {
     fn test_team_dir_ignores_hidden_directories() {
         // .hidden directory exists in chris-wong/team/ with a valid _profile.md
         // but should be skipped
-        let dirs = list_team_member_dirs(&fixtures_path().join("chris-wong")).unwrap();
+        let repo = fixtures_repo();
+        let team = repo.report("chris-wong").list_team_members().unwrap();
 
-        let names: Vec<_> = dirs
-            .iter()
-            .filter_map(|p| p.file_name())
-            .filter_map(|n| n.to_str())
-            .collect();
+        let names: Vec<_> = team.iter().map(|r| r.slug()).collect();
 
         assert!(!names.contains(&".hidden"));
         // Should still have the 3 valid team members
-        assert_eq!(dirs.len(), 3);
+        assert_eq!(team.len(), 3);
     }
 
     #[test]
     fn test_team_dir_ignores_dirs_without_profile() {
         // no-profile directory exists in chris-wong/team/ but has no _profile.md
-        let dirs = list_team_member_dirs(&fixtures_path().join("chris-wong")).unwrap();
+        let repo = fixtures_repo();
+        let team = repo.report("chris-wong").list_team_members().unwrap();
 
-        let names: Vec<_> = dirs
-            .iter()
-            .filter_map(|p| p.file_name())
-            .filter_map(|n| n.to_str())
-            .collect();
+        let names: Vec<_> = team.iter().map(|r| r.slug()).collect();
 
         assert!(!names.contains(&"no-profile"));
         // Should still have the 3 valid team members
-        assert_eq!(dirs.len(), 3);
+        assert_eq!(team.len(), 3);
     }
 
     #[test]
     fn test_load_manager_with_full_team() {
         // Load chris-wong and manually populate team (simulating app.rs load_data behavior)
-        let manager_path = fixtures_path().join("chris-wong");
-        let mut manager = load_report(&manager_path).unwrap();
+        let repo = fixtures_repo();
+        let manager_repo = repo.report("chris-wong");
+        let mut manager = manager_repo.load().unwrap();
 
         // Load team members
-        let team_dirs = list_team_member_dirs(&manager_path).unwrap();
-        for team_dir in team_dirs {
-            if let Ok(team_member) = load_report_with_manager(&team_dir, &manager.slug) {
+        for team_repo in manager_repo.list_team_members().unwrap() {
+            if let Ok(team_member) = team_repo.load() {
                 manager.team.push(team_member);
             }
         }

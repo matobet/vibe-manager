@@ -18,6 +18,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 
 use crate::components::modal::NewReportState;
 use crate::model::{Context, JournalEntry, Report, ReportSummary, Workspace, WorkspaceSummary};
+use crate::storage::WorkspaceRepository;
 
 // Re-export public API
 pub use input::{handle_key_event, poll_event};
@@ -140,6 +141,8 @@ pub enum Msg {
 
 /// Main application state
 pub struct App {
+    /// The workspace repository
+    pub repo: WorkspaceRepository,
     /// The loaded workspace
     pub workspace: Workspace,
     /// All reports in the workspace

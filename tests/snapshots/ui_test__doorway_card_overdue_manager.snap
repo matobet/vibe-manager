@@ -1,0 +1,9 @@
+---
+source: tests/ui_test.rs
+expression: terminal.backend()
+---
+"┌─────┐  ROBIN VANCE — Eng Manager                        M2"
+"│══◆══│  ♥♥♥♥♡  ⚠ you: 8w  zZ                               "
+"│ ◕‿◕ │  squad 4 ▕▓▓▓▓▓▓▓░▏76%  ⚠ Sam T: mood ↘ · 6w (+2 mor"
+"└─────┘                                                     "
+"                                                            "

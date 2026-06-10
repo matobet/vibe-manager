@@ -20,6 +20,8 @@ use crate::theme::{
     style_muted, style_title, COLOR_SECONDARY,
 };
 
+use super::doorway_card::{DoorwayCard, DOORWAY_CARD_HEIGHT};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // REPORT CARD COMPONENT - For dashboard grid
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -176,10 +178,36 @@ impl<'a> AvatarGrid<'a> {
         let card_height: u16 = 9;
 
         let cards_per_row = (area.width / card_width).max(1) as usize;
-        let num_rows = self.summaries.len().div_ceil(cards_per_row);
 
-        let row_constraints: Vec<Constraint> = (0..num_rows)
-            .map(|_| Constraint::Length(card_height))
+        // Partition the urgency-sorted sequence into rows: each manager gets a
+        // full-width doorway row, runs of consecutive ICs chunk into grid rows.
+        // Navigation is linear over summary indices, so mixed row shapes keep
+        // selection semantics unchanged.
+        let mut grid_rows: Vec<GridRow> = Vec::new();
+        let mut ic_run: Vec<usize> = Vec::new();
+        for (idx, summary) in self.summaries.iter().enumerate() {
+            if matches!(summary.report_type, ReportType::Manager) {
+                if !ic_run.is_empty() {
+                    grid_rows.push(GridRow::Ics(std::mem::take(&mut ic_run)));
+                }
+                grid_rows.push(GridRow::Doorway(idx));
+            } else {
+                ic_run.push(idx);
+                if ic_run.len() == cards_per_row {
+                    grid_rows.push(GridRow::Ics(std::mem::take(&mut ic_run)));
+                }
+            }
+        }
+        if !ic_run.is_empty() {
+            grid_rows.push(GridRow::Ics(ic_run));
+        }
+
+        let row_constraints: Vec<Constraint> = grid_rows
+            .iter()
+            .map(|row| match row {
+                GridRow::Doorway(_) => Constraint::Length(DOORWAY_CARD_HEIGHT),
+                GridRow::Ics(_) => Constraint::Length(card_height),
+            })
             .collect();
 
         let rows = Layout::default()
@@ -187,28 +215,35 @@ impl<'a> AvatarGrid<'a> {
             .constraints(row_constraints)
             .split(area);
 
-        for (row_idx, row_area) in rows.iter().enumerate() {
-            let start_idx = row_idx * cards_per_row;
-            let end_idx = (start_idx + cards_per_row).min(self.summaries.len());
-            let row_summaries = &self.summaries[start_idx..end_idx];
+        for (grid_row, row_area) in grid_rows.iter().zip(rows.iter()) {
+            match grid_row {
+                GridRow::Doorway(idx) => {
+                    let card = DoorwayCard::new(&self.summaries[*idx], *idx == self.selected);
+                    card.render(frame, *row_area);
+                }
+                GridRow::Ics(indices) => {
+                    let col_constraints: Vec<Constraint> = indices
+                        .iter()
+                        .map(|_| Constraint::Length(card_width))
+                        .collect();
 
-            let col_constraints: Vec<Constraint> = row_summaries
-                .iter()
-                .map(|_| Constraint::Length(card_width))
-                .collect();
+                    let cols = Layout::default()
+                        .direction(Direction::Horizontal)
+                        .constraints(col_constraints)
+                        .split(*row_area);
 
-            let cols = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints(col_constraints)
-                .split(*row_area);
-
-            for (col_idx, (summary, col_area)) in row_summaries.iter().zip(cols.iter()).enumerate()
-            {
-                let global_idx = start_idx + col_idx;
-                let is_selected = global_idx == self.selected;
-                let card = AvatarCard::new(summary, is_selected);
-                card.render(frame, *col_area);
+                    for (idx, col_area) in indices.iter().zip(cols.iter()) {
+                        let card = AvatarCard::new(&self.summaries[*idx], *idx == self.selected);
+                        card.render(frame, *col_area);
+                    }
+                }
             }
         }
     }
+}
+
+/// A dashboard grid row: one full-width manager doorway or a run of IC cards
+enum GridRow {
+    Doorway(usize),
+    Ics(Vec<usize>),
 }

@@ -1,0 +1,9 @@
+---
+source: tests/ui_test.rs
+expression: terminal.backend()
+---
+"╭─────╮  SASHA NOVAK — Team Lead                          M1"
+"│──◇──│  ♥♥♥♥♡  ✓ you: 3d                                   "
+"│ ◕‿◕ │  squad 0 · no members yet                           "
+"╰─────╯                                                     "
+"                                                            "

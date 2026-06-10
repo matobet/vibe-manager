@@ -5,6 +5,7 @@
 pub mod avatar;
 pub mod dashboard;
 pub mod delete_modal;
+pub mod doorway_card;
 pub mod entry_modal;
 pub mod modal;
 pub mod mood_chart;
@@ -14,6 +15,7 @@ pub mod status_bar;
 
 // Avatar and card components
 pub use avatar::{AvatarCard, AvatarGrid};
+pub use doorway_card::{DoorwayCard, DOORWAY_CARD_HEIGHT};
 
 // Dashboard components
 pub use dashboard::{render_empty_state, render_vibe_manager_title, Dashboard};

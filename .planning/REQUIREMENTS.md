@@ -61,13 +61,29 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated by roadmap) | | |
+| DOOR-01 | Phase 1 | Pending |
+| DOOR-02 | Phase 1 | Pending |
+| DOOR-03 | Phase 1 | Pending |
+| DOOR-04 | Phase 1 | Pending |
+| HALL-01 | Phase 2 | Pending |
+| HALL-02 | Phase 2 | Pending |
+| HALL-03 | Phase 2 | Pending |
+| HALL-04 | Phase 2 | Pending |
+| HALL-05 | Phase 2 | Pending |
+| HALL-06 | Phase 2 | Pending |
+| HALL-07 | Phase 3 | Pending |
+| SKIP-01 | Phase 3 | Pending |
+| SKIP-02 | Phase 3 | Pending |
+| SKIP-03 | Phase 3 | Pending |
+| POLISH-01 | Phase 4 | Pending |
+| POLISH-02 | Phase 4 | Pending |
+| POLISH-03 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 17 total
-- Mapped to phases: 0
-- Unmapped: 17 ⚠️ (roadmap pending)
+- Mapped to phases: 17
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-06-10*
-*Last updated: 2026-06-10 after initial definition*
+*Last updated: 2026-06-10 after roadmap creation (traceability populated)*

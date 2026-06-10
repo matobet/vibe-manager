@@ -17,6 +17,8 @@ use crate::utils::report_color;
 pub struct ReportSummary {
     /// Report's display name
     pub name: String,
+    /// Job title (e.g., "Engineering Manager")
+    pub title: Option<String>,
     /// Career level (P1-P5 or M1-M5)
     pub level: String,
     /// Meeting frequency (weekly, biweekly, monthly)
@@ -56,6 +58,29 @@ pub struct TeamMetrics {
     pub team_overdue_count: usize,
     /// Composite team health score (0-100, higher is healthier)
     pub team_health_score: u8,
+    /// Members needing attention, worst-first (empty = all well)
+    pub outliers: Vec<OutlierInfo>,
+    /// Member longest since last meeting (rotation head) — "next: <name>"
+    pub next_in_rotation: Option<String>,
+}
+
+/// A team member who needs attention, with the data the dashboard names them by
+///
+/// Derived from the member's `ReportSummary` when computing team metrics.
+#[derive(Debug, Clone)]
+pub struct OutlierInfo {
+    /// Member's full name (views abbreviate for display)
+    pub name: String,
+    /// Member's urgency score, for worst-first ordering and the manager bonus
+    pub urgency_score: i32,
+    /// Recent mood trend (drives the "mood ↘" label)
+    pub mood_trend: Option<MoodTrend>,
+    /// Most recent mood rating (drives the "mood 2" label)
+    pub recent_mood: Option<u8>,
+    /// Whether a skip-level meeting is overdue
+    pub is_overdue: bool,
+    /// Days since the member's last meeting (drives the "· 6w" suffix)
+    pub days_since_meeting: Option<i64>,
 }
 
 /// Direction of mood change over recent entries
@@ -84,6 +109,25 @@ pub fn compute_report_summary(
     entries: &[JournalEntry],
     overdue_threshold: u32,
 ) -> ReportSummary {
+    compute_report_summary_with_frequency(
+        report,
+        entries,
+        report.meeting_frequency_days(),
+        overdue_threshold,
+    )
+}
+
+/// Compute a report summary against an explicit meeting cadence
+///
+/// Used for 2nd-level reports, whose overdue status follows the workspace's
+/// `default_2nd_level_frequency` rather than their own profile frequency
+/// (per-member overrides are a later phase).
+pub fn compute_report_summary_with_frequency(
+    report: &Report,
+    entries: &[JournalEntry],
+    frequency_days: u32,
+    overdue_threshold: u32,
+) -> ReportSummary {
     let today = Local::now().date_naive();
 
     // For overdue calculation, only count "meetings" (entries with content)
@@ -96,7 +140,7 @@ pub fn compute_report_summary(
     let days_since_meeting = last_meeting_date.map(|d| (today - d).num_days());
 
     // Calculate if overdue
-    let frequency_days = report.meeting_frequency_days() as i64;
+    let frequency_days = frequency_days as i64;
     let is_overdue = days_since_meeting
         .map(|days| days > frequency_days + overdue_threshold as i64)
         .unwrap_or(true); // No meetings = overdue
@@ -124,6 +168,7 @@ pub fn compute_report_summary(
 
     ReportSummary {
         name: report.profile.name.clone(),
+        title: report.profile.title.clone(),
         level: report
             .profile
             .level
@@ -174,13 +219,56 @@ pub fn compute_team_metrics(team_summaries: &[ReportSummary]) -> TeamMetrics {
         team_summaries,
     );
 
+    // Members needing attention, worst-first by urgency
+    let mut outliers: Vec<OutlierInfo> = active_summaries
+        .iter()
+        .filter(|s| is_outlier(s))
+        .map(|s| OutlierInfo {
+            name: s.name.clone(),
+            urgency_score: s.urgency_score,
+            mood_trend: s.mood_trend,
+            recent_mood: s.recent_mood,
+            is_overdue: s.is_overdue,
+            days_since_meeting: s.days_since_meeting,
+        })
+        .collect();
+    outliers.sort_by_key(|o| std::cmp::Reverse(o.urgency_score));
+
+    // Rotation head: longest since last meeting; never-met ranks first
+    let next_in_rotation = active_summaries
+        .iter()
+        .max_by_key(|s| s.days_since_meeting.unwrap_or(i64::MAX))
+        .map(|s| s.name.clone());
+
     TeamMetrics {
         team_size,
         team_average_mood,
         team_mood_trend,
         team_overdue_count,
         team_health_score,
+        outliers,
+        next_in_rotation,
     }
+}
+
+/// A member needs attention when overdue, low mood, or mood is falling
+fn is_outlier(summary: &ReportSummary) -> bool {
+    summary.is_overdue
+        || summary.recent_mood.is_some_and(|m| m <= 2)
+        || summary.mood_trend == Some(MoodTrend::Falling)
+}
+
+/// Urgency bonus a manager inherits from their worst squad outlier
+///
+/// Half the worst outlier's urgency, capped at 50 so the manager's own
+/// 1-on-1 state still dominates their score. Zero when the squad is healthy.
+/// Applied only to managers — IC scores are untouched.
+pub fn manager_urgency_bonus(metrics: &TeamMetrics) -> i32 {
+    metrics
+        .outliers
+        .first()
+        .map(|o| (o.urgency_score / 2).min(50))
+        .unwrap_or(0)
 }
 
 /// Aggregate individual mood trends into a team trend
@@ -466,6 +554,7 @@ mod tests {
     ) -> ReportSummary {
         ReportSummary {
             name: "Test".to_string(),
+            title: None,
             level: "P3".to_string(),
             meeting_frequency: "biweekly".to_string(),
             active: true,
@@ -478,5 +567,109 @@ mod tests {
             report_type: ReportType::Individual,
             team_metrics: None,
         }
+    }
+
+    fn named_summary(name: &str, urgency: i32, mood: Option<u8>, overdue: bool) -> ReportSummary {
+        let mut summary = create_test_summary(mood, None, overdue);
+        summary.name = name.to_string();
+        summary.urgency_score = urgency;
+        summary
+    }
+
+    #[test]
+    fn test_outliers_worst_first() {
+        let summaries = vec![
+            named_summary("Mild", 20, Some(2), false),
+            named_summary("Healthy", 0, Some(4), false),
+            named_summary("Worst", 80, Some(1), true),
+        ];
+        let metrics = compute_team_metrics(&summaries);
+        assert_eq!(metrics.outliers.len(), 2);
+        assert_eq!(metrics.outliers[0].name, "Worst");
+        assert_eq!(metrics.outliers[1].name, "Mild");
+    }
+
+    #[test]
+    fn test_outliers_empty_when_all_well() {
+        let summaries = vec![
+            named_summary("A", 0, Some(4), false),
+            named_summary("B", 5, Some(5), false),
+        ];
+        let metrics = compute_team_metrics(&summaries);
+        assert!(metrics.outliers.is_empty());
+    }
+
+    #[test]
+    fn test_outlier_falling_trend() {
+        // Good mood, on schedule — but falling trend flags them
+        let mut summary = create_test_summary(Some(4), Some(MoodTrend::Falling), false);
+        summary.name = "Falling".to_string();
+        let metrics = compute_team_metrics(&[summary]);
+        assert_eq!(metrics.outliers.len(), 1);
+        assert_eq!(metrics.outliers[0].name, "Falling");
+    }
+
+    #[test]
+    fn test_outliers_ignore_inactive() {
+        let mut inactive = named_summary("Gone", 100, Some(1), true);
+        inactive.active = false;
+        let metrics = compute_team_metrics(&[inactive]);
+        assert!(metrics.outliers.is_empty());
+    }
+
+    #[test]
+    fn test_next_in_rotation_longest_since_meeting() {
+        let mut a = named_summary("Recent", 0, Some(4), false);
+        a.days_since_meeting = Some(3);
+        let mut b = named_summary("Longest", 0, Some(4), false);
+        b.days_since_meeting = Some(25);
+        let metrics = compute_team_metrics(&[a, b]);
+        assert_eq!(metrics.next_in_rotation.as_deref(), Some("Longest"));
+    }
+
+    #[test]
+    fn test_next_in_rotation_never_met_ranks_first() {
+        let mut a = named_summary("Met", 0, Some(4), false);
+        a.days_since_meeting = Some(60);
+        let mut b = named_summary("Never", 0, Some(4), false);
+        b.days_since_meeting = None;
+        let metrics = compute_team_metrics(&[a, b]);
+        assert_eq!(metrics.next_in_rotation.as_deref(), Some("Never"));
+    }
+
+    #[test]
+    fn test_manager_urgency_bonus_from_worst_outlier() {
+        let summaries = vec![
+            named_summary("Worst", 80, Some(1), true),
+            named_summary("Mild", 20, Some(2), false),
+        ];
+        let metrics = compute_team_metrics(&summaries);
+        assert_eq!(manager_urgency_bonus(&metrics), 40); // 80 / 2
+    }
+
+    #[test]
+    fn test_manager_urgency_bonus_capped() {
+        let summaries = vec![named_summary("Extreme", 130, Some(1), true)];
+        let metrics = compute_team_metrics(&summaries);
+        assert_eq!(manager_urgency_bonus(&metrics), 50); // 130/2 = 65 → capped
+    }
+
+    #[test]
+    fn test_manager_urgency_bonus_zero_when_healthy() {
+        let summaries = vec![named_summary("Fine", 0, Some(4), false)];
+        let metrics = compute_team_metrics(&summaries);
+        assert_eq!(manager_urgency_bonus(&metrics), 0);
+    }
+
+    #[test]
+    fn test_manager_with_troubled_squad_sorts_above_healthy_squad() {
+        // DOOR-04: otherwise-comparable managers — only squads differ
+        let troubled = compute_team_metrics(&[named_summary("Sam", 60, Some(2), true)]);
+        let healthy = compute_team_metrics(&[named_summary("Ana", 0, Some(4), false)]);
+
+        let base_score = 10;
+        let troubled_manager = base_score + manager_urgency_bonus(&troubled);
+        let healthy_manager = base_score + manager_urgency_bonus(&healthy);
+        assert!(troubled_manager > healthy_manager);
     }
 }

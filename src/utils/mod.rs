@@ -1,5 +1,7 @@
+mod name;
 mod slug;
 
+pub use name::*;
 pub use slug::*;
 
 use ratatui::style::Color;

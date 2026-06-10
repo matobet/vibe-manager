@@ -10,8 +10,9 @@ pub mod workspace;
 
 // Re-export types
 pub use computed::{
-    compute_extended_workspace_summary, compute_report_summary, compute_team_metrics,
-    compute_workspace_summary, MoodTrend, ReportSummary, TeamMetrics, WorkspaceSummary,
+    compute_extended_workspace_summary, compute_report_summary,
+    compute_report_summary_with_frequency, compute_team_metrics, compute_workspace_summary,
+    manager_urgency_bonus, MoodTrend, OutlierInfo, ReportSummary, TeamMetrics, WorkspaceSummary,
 };
 pub use meeting::{
     format_entry_filename, parse_entry_timestamp, Context, JournalEntry, JournalEntryFrontmatter,

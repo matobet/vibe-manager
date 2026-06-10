@@ -145,6 +145,13 @@ pub fn progress_bar(value: u8, max: u8) -> String {
     format!("{}{}", "█".repeat(filled), "░".repeat(empty))
 }
 
+/// Health bar with end caps: ▕▓▓▓▓▓▓░░▏ (score 0-100 over `cells` cells)
+/// The numeric percentage must be rendered alongside (accessibility rule)
+pub fn health_bar(score: u8, cells: usize) -> String {
+    let filled = (score.min(100) as usize * cells).div_ceil(100).min(cells);
+    format!("▕{}{}▏", "▓".repeat(filled), "░".repeat(cells - filled))
+}
+
 /// Create a mood gauge with numeric value: ♥♥♥♡♡ (3)
 /// Always includes numeric value for accessibility
 pub fn mood_gauge(value: u8) -> String {
@@ -243,6 +250,16 @@ pub fn format_days_ago(days: Option<i64>) -> String {
     }
 }
 
+/// Compact age for dense card lines: "3d", "6w", "never"
+/// 0-13 days render as days, 14+ as whole weeks
+pub fn format_compact_age(days: Option<i64>) -> String {
+    match days {
+        None => "never".to_string(),
+        Some(d) if d < 14 => format!("{}d", d.max(0)),
+        Some(d) => format!("{}w", d / 7),
+    }
+}
+
 /// Format days since meeting with icon
 /// Includes both text and icon for accessibility
 pub fn format_days_since(days: Option<i64>, frequency_days: u32) -> String {
@@ -292,6 +309,27 @@ mod tests {
         assert_eq!(progress_bar(0, 5), "░░░░░");
         assert_eq!(progress_bar(5, 5), "█████");
         assert_eq!(progress_bar(10, 5), "█████"); // Clamped
+    }
+
+    #[test]
+    fn test_health_bar() {
+        assert_eq!(health_bar(0, 8), "▕░░░░░░░░▏");
+        assert_eq!(health_bar(100, 8), "▕▓▓▓▓▓▓▓▓▏");
+        assert_eq!(health_bar(76, 8), "▕▓▓▓▓▓▓▓░▏"); // 6.08 cells → ceil 7
+        assert_eq!(health_bar(50, 8), "▕▓▓▓▓░░░░▏");
+        assert_eq!(health_bar(1, 8), "▕▓░░░░░░░▏"); // any signal shows
+        assert_eq!(health_bar(200, 8), "▕▓▓▓▓▓▓▓▓▏"); // clamped
+    }
+
+    #[test]
+    fn test_format_compact_age() {
+        assert_eq!(format_compact_age(None), "never");
+        assert_eq!(format_compact_age(Some(0)), "0d");
+        assert_eq!(format_compact_age(Some(3)), "3d");
+        assert_eq!(format_compact_age(Some(13)), "13d");
+        assert_eq!(format_compact_age(Some(14)), "2w");
+        assert_eq!(format_compact_age(Some(42)), "6w");
+        assert_eq!(format_compact_age(Some(-1)), "0d"); // future-dated entry
     }
 
     #[test]

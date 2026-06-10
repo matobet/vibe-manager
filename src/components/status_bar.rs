@@ -15,6 +15,7 @@ pub struct StatusBar<'a> {
     view_mode: ViewMode,
     context: &'a str,
     message: Option<&'a str>,
+    in_hall: bool,
 }
 
 impl<'a> StatusBar<'a> {
@@ -23,7 +24,14 @@ impl<'a> StatusBar<'a> {
             view_mode,
             context,
             message,
+            in_hall: false,
         }
+    }
+
+    /// Swap the dashboard key hints for hall navigation hints
+    pub fn in_hall(mut self, in_hall: bool) -> Self {
+        self.in_hall = in_hall;
+        self
     }
 
     pub fn render(&self, frame: &mut Frame, area: Rect) {
@@ -70,6 +78,7 @@ impl<'a> StatusBar<'a> {
 
         // Right side: keybindings hint
         let hints = match self.view_mode {
+            ViewMode::Dashboard if self.in_hall => "h/l:nav  Enter:view  Esc:back  q:quit",
             ViewMode::Dashboard => "h/l:nav  Enter:view  n:new  ?:help  q:quit",
             ViewMode::ReportDetail => "e:edit  n:new  m:mood  Del:delete  Enter:view  Bksp:back",
             ViewMode::NoteViewer | ViewMode::DeleteConfirmModal => {

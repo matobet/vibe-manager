@@ -18,7 +18,7 @@ pub use avatar::{AvatarCard, AvatarGrid};
 pub use doorway_card::{DoorwayCard, DOORWAY_CARD_HEIGHT};
 
 // Dashboard components
-pub use dashboard::{render_empty_state, render_vibe_manager_title, Dashboard};
+pub use dashboard::{render_empty_state, render_vibe_manager_title, Dashboard, HallHeader};
 
 // Modal components
 pub use delete_modal::DeleteConfirmModal;

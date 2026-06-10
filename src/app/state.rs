@@ -5,15 +5,15 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
-use super::{App, ViewMode, STATUS_MESSAGE_DURATION};
+use super::{App, HallFrame, ViewMode, STATUS_MESSAGE_DURATION};
 use crate::components::modal::NewReportState;
 use crate::model::{
     compute_report_summary, compute_report_summary_with_frequency, compute_team_metrics,
     compute_workspace_summary, manager_urgency_bonus, Context, JournalEntry, WorkspaceSummary,
 };
-use crate::storage::WorkspaceRepository;
+use crate::storage::{ReportRepository, WorkspaceRepository};
 
 impl App {
     /// Create new application from workspace path
@@ -24,6 +24,7 @@ impl App {
         let mut app = App {
             repo,
             workspace,
+            hall_stack: Vec::new(),
             reports: Vec::new(),
             entries_by_report: Vec::new(),
             summaries: Vec::new(),
@@ -53,9 +54,30 @@ impl App {
         Ok(app)
     }
 
-    /// Load all data from workspace
+    /// Repositories of the roster at the current hall path
+    ///
+    /// Empty stack = workspace root; otherwise walk the stack down through
+    /// `team/` directories. Supports arbitrary nesting depth.
+    fn current_roster_repos(&self) -> Result<Vec<ReportRepository>> {
+        let mut frames = self.hall_stack.iter();
+        let Some(first) = frames.next() else {
+            return Ok(self.repo.list_reports()?);
+        };
+        let mut repo = self.repo.report(&first.slug);
+        for frame in frames {
+            repo = repo
+                .list_team_members()?
+                .into_iter()
+                .find(|r| r.slug() == frame.slug)
+                .ok_or_else(|| anyhow!("hall member not found: {}", frame.slug))?;
+        }
+        Ok(repo.list_team_members()?)
+    }
+
+    /// Load all data for the current roster (root or the hall being viewed)
     pub fn load_data(&mut self) -> Result<()> {
-        let report_repos = self.repo.list_reports()?;
+        let report_repos = self.current_roster_repos()?;
+        let in_hall = !self.hall_stack.is_empty();
 
         self.reports.clear();
         self.entries_by_report.clear();
@@ -93,7 +115,18 @@ impl App {
                 }
 
                 let entries = report_repo.entries().list().unwrap_or_default();
-                let mut summary = compute_report_summary(&report, &entries, overdue_threshold);
+                // Inside a hall everyone is a 2nd-level report: their overdue
+                // status follows the skip-level cadence, not their profile
+                let mut summary = if in_hall {
+                    compute_report_summary_with_frequency(
+                        &report,
+                        &entries,
+                        second_level_days,
+                        overdue_threshold,
+                    )
+                } else {
+                    compute_report_summary(&report, &entries, overdue_threshold)
+                };
 
                 if report.is_manager() {
                     let team_metrics = compute_team_metrics(&member_summaries);
@@ -149,15 +182,78 @@ impl App {
         })
     }
 
+    /// Repository for one report of the current roster, faithful to its path
+    ///
+    /// Inside a hall, `WorkspaceRepository::report(slug)` would resolve from
+    /// the workspace root and miss the nested `team/` directory — always go
+    /// through this helper for entry mutations.
+    pub(crate) fn report_repo(&self, report_idx: usize) -> ReportRepository {
+        let report = &self.reports[report_idx];
+        ReportRepository::new(report.path.clone(), report.manager_slug.clone())
+    }
+
+    /// Enter the selected manager's hall (no-op on ICs and empty squads)
+    pub(crate) fn enter_hall(&mut self) -> Result<()> {
+        let idx = self.selected_index;
+        let Some(report) = self.reports.get(idx) else {
+            return Ok(());
+        };
+        if !report.is_manager() {
+            return Ok(()); // Space does nothing on IC cards (HALL-01)
+        }
+        if report.team.is_empty() {
+            self.set_status(format!(
+                "{}'s squad has no members yet",
+                report.profile.name
+            ));
+            return Ok(());
+        }
+
+        self.hall_stack.push(HallFrame {
+            slug: report.slug.clone(),
+            name: report.profile.name.clone(),
+            selected_index: idx,
+        });
+        if let Err(e) = self.load_data() {
+            // Walk back so a failed descent never strands the UI
+            self.hall_stack.pop();
+            self.load_data()?;
+            self.set_status(format!("Error: {}", e));
+            return Ok(());
+        }
+        self.selected_index = 0;
+        Ok(())
+    }
+
+    /// Walk up one hall level; hard no-op at the root dashboard (HALL-03)
+    pub(crate) fn exit_hall(&mut self) -> Result<()> {
+        let Some(frame) = self.hall_stack.pop() else {
+            return Ok(()); // at root — q is the only quit
+        };
+        // Reload the parent roster from disk so the manager's squad line
+        // reflects anything recorded inside the hall
+        self.load_data()?;
+        // The roster may have re-sorted; find the manager we came from by slug
+        self.selected_index = self
+            .reports
+            .iter()
+            .position(|r| r.slug == frame.slug)
+            .unwrap_or_else(|| {
+                frame
+                    .selected_index
+                    .min(self.reports.len().saturating_sub(1))
+            });
+        Ok(())
+    }
+
     /// Delete an entry by report and entry index
     ///
     /// Returns Ok(()) on success, sets status message on error
     pub fn delete_entry(&mut self, report_idx: usize, entry_idx: usize) -> Result<()> {
-        let report = &self.reports[report_idx];
         let entry = &self.entries_by_report[report_idx][entry_idx];
 
-        // Delete the file via repository
-        self.repo.report(&report.slug).entries().delete(entry)?;
+        // Delete the file via repository (path-faithful for hall members)
+        self.report_repo(report_idx).entries().delete(entry)?;
 
         // Remove from in-memory list
         self.entries_by_report[report_idx].remove(entry_idx);

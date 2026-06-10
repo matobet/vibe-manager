@@ -10,11 +10,27 @@ use ratatui::{
 
 use crate::model::{ReportSummary, WorkspaceSummary};
 use crate::theme::{
-    mood_gauge, rpg_block, simple_block, style_header, style_muted, style_success, style_title,
-    style_warning, COLOR_PRIMARY, COLOR_SECONDARY, COLOR_SUCCESS, ICON_HEART, ICON_WARNING,
+    health_bar, mood_gauge, rpg_block, simple_block, style_header, style_muted, style_success,
+    style_title, style_warning, COLOR_PRIMARY, COLOR_SECONDARY, COLOR_SUCCESS, COLOR_TEXT,
+    ICON_HEART, ICON_WARNING,
 };
 
 use super::AvatarGrid;
+
+/// Header data for a hall (the dashboard re-rooted at a manager's team)
+///
+/// Present only when inside a hall; drives the breadcrumb line and the
+/// party block title (HALL-02).
+pub struct HallHeader {
+    /// Breadcrumb trail, e.g. `YOU ▸ CHRIS'S SQUAD` or `YOU ▸ CHRIS ▸ TAYLOR'S SQUAD`
+    pub breadcrumb: String,
+    /// Number of members in this hall's roster
+    pub member_count: usize,
+    /// Composite health score of this hall's roster (0-100)
+    pub health_score: u8,
+    /// Block title for the roster grid, e.g. `Chris's Squad`
+    pub block_title: String,
+}
 
 /// Render the VIBE MANAGER title bar
 ///
@@ -43,6 +59,7 @@ pub struct Dashboard<'a> {
     summaries: &'a [ReportSummary],
     workspace_summary: &'a WorkspaceSummary,
     selected: usize,
+    hall: Option<HallHeader>,
 }
 
 impl<'a> Dashboard<'a> {
@@ -55,27 +72,72 @@ impl<'a> Dashboard<'a> {
             summaries,
             workspace_summary,
             selected,
+            hall: None,
         }
     }
 
+    /// Render as a hall: breadcrumb line + squad block title (HALL-02)
+    pub fn with_hall(mut self, hall: HallHeader) -> Self {
+        self.hall = Some(hall);
+        self
+    }
+
     pub fn render(&self, frame: &mut Frame, area: Rect) {
-        // Layout: Title, Stats panel, Avatar grid
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
+        // Layout: Title, [Breadcrumb in halls], Stats panel, Avatar grid
+        let constraints: Vec<Constraint> = if self.hall.is_some() {
+            vec![
+                Constraint::Length(3), // Title
+                Constraint::Length(1), // Hall breadcrumb
+                Constraint::Length(4), // Stats
+                Constraint::Min(12),   // Avatar grid
+            ]
+        } else {
+            vec![
                 Constraint::Length(3), // Title
                 Constraint::Length(4), // Stats
                 Constraint::Min(12),   // Avatar grid
-            ])
+            ]
+        };
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(constraints)
             .split(area);
 
         self.render_title(frame, chunks[0]);
-        self.render_stats(frame, chunks[1]);
-        self.render_party(frame, chunks[2]);
+        if self.hall.is_some() {
+            self.render_breadcrumb(frame, chunks[1]);
+            self.render_stats(frame, chunks[2]);
+            self.render_party(frame, chunks[3]);
+        } else {
+            self.render_stats(frame, chunks[1]);
+            self.render_party(frame, chunks[2]);
+        }
     }
 
     fn render_title(&self, frame: &mut Frame, area: Rect) {
         render_vibe_manager_title(frame, area);
+    }
+
+    fn render_breadcrumb(&self, frame: &mut Frame, area: Rect) {
+        let Some(hall) = &self.hall else { return };
+        let members = if hall.member_count == 1 {
+            "member"
+        } else {
+            "members"
+        };
+        let line = Line::from(vec![
+            Span::styled(format!(" {}", hall.breadcrumb), style_title()),
+            Span::styled(
+                format!(" · {} {} · ", hall.member_count, members),
+                style_muted(),
+            ),
+            Span::styled(health_bar(hall.health_score, 8), style_header()),
+            Span::styled(
+                format!("{}%", hall.health_score),
+                Style::default().fg(COLOR_TEXT),
+            ),
+        ]);
+        frame.render_widget(Paragraph::new(line), area);
     }
 
     fn render_stats(&self, frame: &mut Frame, area: Rect) {
@@ -140,8 +202,12 @@ impl<'a> Dashboard<'a> {
     }
 
     fn render_party(&self, frame: &mut Frame, area: Rect) {
-        // Outer block with RPG title
-        let block = rpg_block("Your Party");
+        // Outer block with RPG title (squad name inside a hall)
+        let title = self
+            .hall
+            .as_ref()
+            .map_or("Your Party", |hall| hall.block_title.as_str());
+        let block = rpg_block(title);
         let inner = block.inner(area);
         frame.render_widget(block, area);
 

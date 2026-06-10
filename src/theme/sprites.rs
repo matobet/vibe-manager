@@ -118,8 +118,10 @@ impl<'a> FaceSprite<'a> {
         let frame_bottom_str = frame_bottom(self.level);
         let (left, right) = frame_mid(self.level);
         let face_expr = face(self.mood, self.is_overdue);
-        // Mood 2 uses fullwidth `︵` character - shift face left to compensate
-        let face_line = if self.mood == Some(2) {
+        // Mood 2 uses fullwidth `︵` character - shift face left to compensate.
+        // Only when that face actually renders: overdue replaces it with `-_-`,
+        // which needs normal spacing.
+        let face_line = if face_expr == "◦︵◦" {
             format!("{}{} {}", left, face_expr, right) // no leading space
         } else {
             format!("{} {} {}", left, face_expr, right) // normal spacing
@@ -199,6 +201,35 @@ mod tests {
             days_since_meeting: Some(5),
             style: Style::default(),
         }
+    }
+
+    #[test]
+    fn test_mood2_compensation_only_for_visible_frown() {
+        // Mood 2, not overdue: fullwidth ◦︵◦ renders, leading space dropped
+        let sprite = FaceSprite {
+            level: Some("P2"),
+            mood: Some(2),
+            is_overdue: false,
+            days_since_meeting: Some(5),
+            style: Style::default(),
+        };
+        let face_line = &sprite.lines()[1];
+        assert!(face_line.to_string().starts_with("│◦︵◦"));
+
+        // Mood 2 but overdue: face is -_- (single-width), normal spacing
+        let sprite = FaceSprite {
+            level: Some("P2"),
+            mood: Some(2),
+            is_overdue: true,
+            days_since_meeting: Some(5),
+            style: Style::default(),
+        };
+        let face_line = &sprite.lines()[1];
+        assert!(
+            face_line.to_string().contains("│ -_- │"),
+            "overdue face must keep normal spacing, got {:?}",
+            face_line.to_string()
+        );
     }
 
     #[test]

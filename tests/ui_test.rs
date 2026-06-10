@@ -7,8 +7,12 @@
 use ratatui::style::Color;
 use ratatui::{backend::TestBackend, Terminal};
 
-use vibe_manager::components::{AvatarGrid, DoorwayCard, DOORWAY_CARD_HEIGHT};
-use vibe_manager::model::{MoodTrend, OutlierInfo, ReportSummary, ReportType, TeamMetrics};
+use vibe_manager::components::{
+    AvatarGrid, Dashboard, DoorwayCard, HallHeader, DOORWAY_CARD_HEIGHT,
+};
+use vibe_manager::model::{
+    MoodTrend, OutlierInfo, ReportSummary, ReportType, TeamMetrics, WorkspaceSummary,
+};
 
 /// A manager summary with a troubled squad (named worst outlier + overflow)
 fn manager_with_outliers() -> ReportSummary {
@@ -190,6 +194,39 @@ fn dashboard_grid_mixes_doorway_and_ic_rows() {
     terminal
         .draw(|frame| {
             AvatarGrid::new(&summaries, 0).render(frame, frame.area());
+        })
+        .unwrap();
+    insta::assert_snapshot!(terminal.backend());
+}
+
+/// HALL-02: hall header shows breadcrumb, member count, and team health bar
+#[test]
+fn dashboard_hall_header_breadcrumb() {
+    let summaries = vec![
+        ic_summary("Sam Taylor", "P2"),
+        ic_summary("Kim Diaz", "P1"),
+        ic_summary("Pat Lopez", "P3"),
+    ];
+    let workspace_summary = WorkspaceSummary {
+        team_size: 3,
+        active_count: 3,
+        overdue_count: 1,
+        average_mood: Some(4.0),
+        total_report_count: 3,
+    };
+
+    let backend = TestBackend::new(60, 22);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            Dashboard::new(&summaries, &workspace_summary, 0)
+                .with_hall(HallHeader {
+                    breadcrumb: "YOU ▸ JORDAN'S SQUAD".to_string(),
+                    member_count: 3,
+                    health_score: 76,
+                    block_title: "Jordan's Squad".to_string(),
+                })
+                .render(frame, frame.area());
         })
         .unwrap();
     insta::assert_snapshot!(terminal.backend());

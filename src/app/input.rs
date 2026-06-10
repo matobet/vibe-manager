@@ -40,22 +40,25 @@ pub fn handle_key_event(app: &App, key: KeyEvent) -> Option<Msg> {
 /// Handle keys in Dashboard view
 fn handle_dashboard_key(key: KeyEvent, _lowercase_char: Option<char>) -> Option<Msg> {
     match key.code {
-        // Arrow keys
-        KeyCode::Left => Some(Msg::SelectPrev),
+        // Arrow keys (Left shares h's boundary-ascend behavior in halls)
+        KeyCode::Left => Some(Msg::SelectPrevOrAscend),
         KeyCode::Right => Some(Msg::SelectNext),
         KeyCode::Down => Some(Msg::SelectNext),
         KeyCode::Up => Some(Msg::SelectPrev),
         KeyCode::Enter => Some(Msg::ViewReport),
+        // Esc walks up one hall level; hard no-op at root (q is the only quit)
+        KeyCode::Esc => Some(Msg::ExitHall),
         // Character keys (case-insensitive, except g/G)
         KeyCode::Char('g') => Some(Msg::SelectFirst),
         KeyCode::Char('G') => Some(Msg::SelectLast),
         KeyCode::Char(c) => match c.to_ascii_lowercase() {
             'q' => Some(Msg::Quit),
-            'h' => Some(Msg::SelectPrev),
+            'h' => Some(Msg::SelectPrevOrAscend),
             'l' => Some(Msg::SelectNext),
             'j' => Some(Msg::SelectNext),
             'k' => Some(Msg::SelectPrev),
-            ' ' => Some(Msg::ViewReport),
+            // The conscious Space rebind: container verb (Enter stays "the person")
+            ' ' => Some(Msg::EnterHall),
             'n' => Some(Msg::ShowNewReport),
             '?' => Some(Msg::ShowHelp),
             'r' => Some(Msg::RefreshData),

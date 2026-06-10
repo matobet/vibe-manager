@@ -54,6 +54,38 @@ impl App {
                 Effect::None
             }
 
+            Msg::SelectPrevOrAscend => {
+                // `h`/Left at the leftmost item inside a hall ascends one
+                // level (ranger/lf convention, HALL-04); elsewhere it is
+                // plain SelectPrev (wrapping, as before)
+                if !self.hall_stack.is_empty()
+                    && self.selected_index == 0
+                    && matches!(self.view_mode, ViewMode::Dashboard)
+                {
+                    self.exit_hall()?;
+                } else {
+                    let max_len = self.current_list_len();
+                    if max_len > 0 {
+                        self.selected_index = if self.selected_index == 0 {
+                            max_len - 1
+                        } else {
+                            self.selected_index - 1
+                        };
+                    }
+                }
+                Effect::None
+            }
+
+            Msg::EnterHall => {
+                self.enter_hall()?;
+                Effect::None
+            }
+
+            Msg::ExitHall => {
+                self.exit_hall()?;
+                Effect::None
+            }
+
             Msg::SelectFirst => {
                 self.selected_index = 0;
                 Effect::None
@@ -137,10 +169,10 @@ impl App {
                 if let (Some(report_idx), Some(meet_idx)) =
                     (self.selected_report_index, self.selected_entry_index)
                 {
-                    let report = &self.reports[report_idx];
+                    let entry_repo = self.report_repo(report_idx).entries();
                     let meeting = &mut self.entries_by_report[report_idx][meet_idx];
                     meeting.frontmatter.mood = Some(mood);
-                    if let Err(e) = self.repo.report(&report.slug).entries().save(meeting) {
+                    if let Err(e) = entry_repo.save(meeting) {
                         self.set_status(format!("Error saving mood: {}", e));
                     } else {
                         self.set_status("Mood updated");
@@ -172,8 +204,14 @@ impl App {
             }
 
             Msg::ShowNewReport => {
-                self.new_report_state = crate::components::modal::NewReportState::default();
-                self.view_mode = ViewMode::NewReportModal;
+                if self.hall_stack.is_empty() {
+                    self.new_report_state = crate::components::modal::NewReportState::default();
+                    self.view_mode = ViewMode::NewReportModal;
+                } else {
+                    // Recruiting 2nd-level members is the manager's job —
+                    // creation stays at the guild root for now
+                    self.set_status("Recruit from the guild root — Esc to walk back");
+                }
                 Effect::None
             }
 
@@ -415,8 +453,7 @@ impl App {
     /// Handle SaveEntry message
     fn handle_save_entry(&mut self) {
         if let Some(report_idx) = self.selected_report_index {
-            let report = &self.reports[report_idx];
-            match self.repo.report(&report.slug).entries().create_observation(
+            match self.report_repo(report_idx).entries().create_observation(
                 self.pending_entry_mood,
                 Some(self.pending_entry_context),
                 self.pending_entry_notes.clone(),

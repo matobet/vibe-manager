@@ -75,12 +75,19 @@ pub enum Msg {
     SelectNext,
     /// Select previous item in list
     SelectPrev,
+    /// Select previous, or ascend one hall level when already at the leftmost
+    /// item inside a hall (ranger/lf convention — sent by `h` and Left)
+    SelectPrevOrAscend,
     /// Jump to first item
     SelectFirst,
     /// Jump to last item
     SelectLast,
     /// View the selected report
     ViewReport,
+    /// Enter the selected manager's hall (no-op on IC cards)
+    EnterHall,
+    /// Walk up one hall level (hard no-op at the root dashboard)
+    ExitHall,
 
     // Report detail actions
     /// View a specific meeting by display index
@@ -139,13 +146,29 @@ pub enum Msg {
     Enter,
 }
 
+/// One level of hall navigation: the manager whose hall was entered
+///
+/// The stack as a whole is the roster path: empty = root dashboard,
+/// `[chris]` = inside Chris's hall, `[chris, taylor]` = one level deeper.
+#[derive(Debug, Clone)]
+pub struct HallFrame {
+    /// Slug of the manager whose hall this is (resolves the roster path)
+    pub slug: String,
+    /// Manager's display name (drives the breadcrumb)
+    pub name: String,
+    /// Selection index in the parent roster, restored on exit
+    pub selected_index: usize,
+}
+
 /// Main application state
 pub struct App {
     /// The workspace repository
     pub repo: WorkspaceRepository,
     /// The loaded workspace
     pub workspace: Workspace,
-    /// All reports in the workspace
+    /// Hall navigation stack: empty = root roster, each frame one level deeper
+    pub hall_stack: Vec<HallFrame>,
+    /// All reports in the current roster (root or the hall being viewed)
     pub reports: Vec<Report>,
     /// Journal entries indexed by report
     pub entries_by_report: Vec<Vec<JournalEntry>>,

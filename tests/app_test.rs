@@ -426,6 +426,249 @@ mod tests {
     }
 
     #[test]
+    fn test_enter_hall_swaps_roster_to_squad() {
+        use vibe_manager::app::Msg;
+
+        let path = fixtures_path();
+        let mut app = vibe_manager::app::App::new(path).expect("Failed to load app");
+
+        app.selected_index = chris_wong_idx(&app);
+        app.update(Msg::EnterHall).unwrap();
+
+        assert_eq!(app.hall_stack.len(), 1);
+        assert_eq!(app.hall_stack[0].slug, "chris-wong");
+        assert_eq!(app.reports.len(), 7, "hall roster = Chris's squad");
+        assert!(app.reports.iter().all(|r| r.is_second_level()));
+        assert_eq!(app.selected_index, 0);
+    }
+
+    #[test]
+    fn test_enter_hall_noop_on_ic() {
+        use vibe_manager::app::Msg;
+
+        let path = fixtures_path();
+        let mut app = vibe_manager::app::App::new(path).expect("Failed to load app");
+
+        let ic_idx = app
+            .reports
+            .iter()
+            .position(|r| r.profile.name == "Alex Chen")
+            .expect("Alex Chen not found");
+        app.selected_index = ic_idx;
+        let roster_len = app.reports.len();
+
+        app.update(Msg::EnterHall).unwrap();
+
+        assert!(app.hall_stack.is_empty(), "Space on an IC must do nothing");
+        assert_eq!(app.reports.len(), roster_len);
+        assert_eq!(app.selected_index, ic_idx);
+    }
+
+    #[test]
+    fn test_enter_hall_noop_on_empty_squad() {
+        use vibe_manager::app::Msg;
+
+        let path = fixtures_path();
+        let mut app = vibe_manager::app::App::new(path).expect("Failed to load app");
+
+        let idx = app
+            .reports
+            .iter()
+            .position(|r| r.profile.name == "Minimal Manager")
+            .expect("Minimal Manager not found");
+        app.selected_index = idx;
+
+        app.update(Msg::EnterHall).unwrap();
+
+        assert!(
+            app.hall_stack.is_empty(),
+            "empty squad has no hall to enter"
+        );
+        assert!(app.status_text().is_some(), "user gets a status hint");
+    }
+
+    #[test]
+    fn test_exit_hall_restores_parent_and_selection() {
+        use vibe_manager::app::Msg;
+
+        let path = fixtures_path();
+        let mut app = vibe_manager::app::App::new(path).expect("Failed to load app");
+
+        let chris_idx = chris_wong_idx(&app);
+        app.selected_index = chris_idx;
+        app.update(Msg::EnterHall).unwrap();
+        app.update(Msg::SelectNext).unwrap(); // wander inside the hall
+
+        app.update(Msg::ExitHall).unwrap();
+
+        assert!(app.hall_stack.is_empty());
+        assert_eq!(
+            app.reports[app.selected_index].slug, "chris-wong",
+            "selection returns to the manager we came from"
+        );
+    }
+
+    #[test]
+    fn test_exit_hall_noop_at_root() {
+        use vibe_manager::app::Msg;
+
+        let path = fixtures_path();
+        let mut app = vibe_manager::app::App::new(path).expect("Failed to load app");
+
+        let roster_len = app.reports.len();
+        app.update(Msg::ExitHall).unwrap(); // Esc at root: hard no-op
+
+        assert!(!app.should_quit);
+        assert_eq!(app.reports.len(), roster_len);
+    }
+
+    #[test]
+    fn test_nested_hall_two_levels_deep() {
+        use vibe_manager::app::Msg;
+
+        let path = fixtures_path();
+        let mut app = vibe_manager::app::App::new(path).expect("Failed to load app");
+
+        // Enter Chris's hall, then Taylor's hall inside it
+        app.selected_index = chris_wong_idx(&app);
+        app.update(Msg::EnterHall).unwrap();
+
+        let taylor_idx = app
+            .reports
+            .iter()
+            .position(|r| r.slug == "taylor-brooks")
+            .expect("Taylor not in Chris's hall");
+        app.selected_index = taylor_idx;
+        app.update(Msg::EnterHall).unwrap();
+
+        assert_eq!(app.hall_stack.len(), 2);
+        assert_eq!(app.reports.len(), 1, "Taylor's pod has one member");
+        assert_eq!(app.reports[0].slug, "priya-anand");
+
+        // Walk all the way back out
+        app.update(Msg::ExitHall).unwrap();
+        assert_eq!(app.hall_stack.len(), 1);
+        assert_eq!(app.reports[app.selected_index].slug, "taylor-brooks");
+        app.update(Msg::ExitHall).unwrap();
+        assert!(app.hall_stack.is_empty());
+        assert_eq!(app.reports[app.selected_index].slug, "chris-wong");
+    }
+
+    #[test]
+    fn test_boundary_h_ascends_in_hall_wraps_at_root() {
+        use vibe_manager::app::Msg;
+
+        let path = fixtures_path();
+        let mut app = vibe_manager::app::App::new(path).expect("Failed to load app");
+
+        // At root, h at index 0 wraps (existing behavior unchanged)
+        app.selected_index = 0;
+        let roster_len = app.reports.len();
+        app.update(Msg::SelectPrevOrAscend).unwrap();
+        assert_eq!(app.selected_index, roster_len - 1);
+        assert!(app.hall_stack.is_empty());
+
+        // Inside a hall, h at index 0 ascends (HALL-04)
+        app.selected_index = chris_wong_idx(&app);
+        app.update(Msg::EnterHall).unwrap();
+        app.update(Msg::SelectPrevOrAscend).unwrap();
+        assert!(app.hall_stack.is_empty(), "boundary-h walks up one level");
+
+        // Inside a hall but not at index 0, h is plain SelectPrev
+        app.selected_index = chris_wong_idx(&app);
+        app.update(Msg::EnterHall).unwrap();
+        app.update(Msg::SelectNext).unwrap();
+        app.update(Msg::SelectPrevOrAscend).unwrap();
+        assert_eq!(app.hall_stack.len(), 1, "h mid-roster stays in the hall");
+        assert_eq!(app.selected_index, 0);
+    }
+
+    #[test]
+    fn test_skip_level_note_saves_into_nested_journal() {
+        use vibe_manager::app::{Msg, ViewMode};
+
+        let temp = setup_temp_workspace();
+        let mut app =
+            vibe_manager::app::App::new(temp.path().to_path_buf()).expect("Failed to load app");
+
+        // Enter Chris's hall and record an observation for Morgan
+        app.selected_index = chris_wong_idx(&app);
+        app.update(Msg::EnterHall).unwrap();
+        let morgan_idx = app
+            .reports
+            .iter()
+            .position(|r| r.slug == "morgan-smith")
+            .expect("Morgan not in hall");
+
+        app.selected_report_index = Some(morgan_idx);
+        app.view_mode = ViewMode::ReportDetail;
+        app.update(Msg::ShowEntryInput).unwrap();
+        app.update(Msg::SetEntryMood(3)).unwrap();
+        app.update(Msg::SaveEntry).unwrap();
+
+        // The entry must land in the NESTED journal, not a root-level dir
+        let new_entry = app.entries_by_report[morgan_idx].last().unwrap();
+        assert!(
+            new_entry
+                .path
+                .starts_with(temp.path().join("chris-wong/team/morgan-smith")),
+            "entry path escaped the hall: {:?}",
+            new_entry.path
+        );
+        assert!(new_entry.path.exists());
+        assert!(
+            !temp.path().join("morgan-smith").exists(),
+            "no phantom root-level report dir may appear"
+        );
+
+        // Walking back out refreshes Chris's squad metrics from disk
+        app.view_mode = ViewMode::Dashboard;
+        app.update(Msg::ExitHall).unwrap();
+        let chris_idx = chris_wong_idx(&app);
+        assert!(app.summaries[chris_idx].team_metrics.is_some());
+    }
+
+    #[test]
+    fn test_hall_uses_skip_level_cadence() {
+        use vibe_manager::app::Msg;
+
+        let path = fixtures_path();
+        let mut app = vibe_manager::app::App::new(path).expect("Failed to load app");
+
+        app.selected_index = chris_wong_idx(&app);
+        app.update(Msg::EnterHall).unwrap();
+
+        // Inside the hall, never-met Devon is overdue under the monthly
+        // skip-level cadence — same shape Phase 1 computed for TeamMetrics
+        let devon = app
+            .reports
+            .iter()
+            .position(|r| r.slug == "devon-okafor")
+            .expect("Devon not in hall");
+        assert!(app.summaries[devon].is_overdue);
+        assert!(app.summaries[devon].days_since_meeting.is_none());
+    }
+
+    #[test]
+    fn test_new_report_blocked_inside_hall() {
+        use vibe_manager::app::{Msg, ViewMode};
+
+        let path = fixtures_path();
+        let mut app = vibe_manager::app::App::new(path).expect("Failed to load app");
+
+        app.selected_index = chris_wong_idx(&app);
+        app.update(Msg::EnterHall).unwrap();
+        app.update(Msg::ShowNewReport).unwrap();
+
+        assert_eq!(
+            app.view_mode,
+            ViewMode::Dashboard,
+            "no recruit modal in halls"
+        );
+        assert!(app.status_text().is_some());
+    }
+
+    #[test]
     fn test_manager_without_team_dir_gets_empty_metrics() {
         let path = fixtures_path();
         let app = vibe_manager::app::App::new(path).expect("Failed to load app");

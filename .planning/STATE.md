@@ -1,3 +1,19 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: planning
+stopped_at: Phase 1 implemented directly (GSD bypassed at user request)
+last_updated: "2026-06-10T21:15:37.919Z"
+last_activity: 2026-06-10 — Phase 1 (Doorway Cards) implemented and tested
+progress:
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+---
+
 # Project State
 
 ## Project Reference
@@ -10,15 +26,16 @@ See: .planning/PROJECT.md (updated 2026-06-10)
 ## Current Position
 
 Phase: 1 of 4 (Doorway Cards)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-06-10 — Roadmap created (4 phases, 17/17 requirements mapped)
+Plan: implemented without PLAN.md (direct execution)
+Status: Implemented — pending verification (/gsd:verify-work 1)
+Last activity: 2026-06-10 — Phase 1 implemented: DOOR-01..04 with snapshot + integration tests
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] ~25%
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0
 - Average duration: -
 - Total execution time: 0 hours
@@ -30,6 +47,7 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 **Recent Trend:**
+
 - Last 5 plans: -
 - Trend: -
 
@@ -40,6 +58,16 @@ Progress: [░░░░░░░░░░] 0%
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
+
+- 2026-06-10 — Phase 1 executed directly in-session (user explicitly bypassed
+  GSD planner/executor for speed). Artifacts used: 01-RESEARCH.md, 01-UI-SPEC.md,
+  01-PATTERNS.md, 01-VALIDATION.md. Commits: 038eefc (model), 304a60f (app),
+  150fa1c (ui), 45ecdab (docs). All success criteria covered by tests
+  (8 snapshot/render + 5 integration + 11 unit); clippy/fmt/test gates green.
+- 2026-06-10 — Managers always get Some(TeamMetrics) (empty for no team/ dir);
+  views render `squad 0 · no members yet` when team_size == 0.
+- 2026-06-10 — Skip-level cadence: all 2nd-level summaries computed against
+  workspace default_2nd_level_frequency (per-member override deferred to Phase 3).
 Recent decisions affecting current work:
 
 - Guild Halls drill-down over accordion expansion; one hall per screen, dashboard component re-rooted
@@ -70,6 +98,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-10
-Stopped at: Roadmap and state initialized; ready for `/gsd:plan-phase 1`
-Resume file: None
+Last session: 2026-06-10T21:15:37.911Z
+Stopped at: Phase 1 UI-SPEC approved
+Resume file: .planning/phases/01-doorway-cards/01-UI-SPEC.md

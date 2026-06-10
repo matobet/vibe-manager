@@ -10,19 +10,19 @@ Design contract: `docs/features/managing-managers.md` (Guild Halls UX spec).
 
 ### Doorway Cards
 
-- [ ] **DOOR-01**: Manager renders as a 4-line doorway card on the dashboard (identity / relationship / squad summary / door hint)
-- [ ] **DOOR-02**: Squad line shows size, health bar, and worst outlier by name — `(+N more)` when several, `★ all well · next: <name>` when healthy
-- [ ] **DOOR-03**: Door hint renders only on the selected card (fixed card height, blank line when unselected)
-- [ ] **DOOR-04**: Manager urgency score incorporates the worst squad outlier so troubled teams sort upward
+- [x] **DOOR-01**: Manager renders as a 4-line doorway card on the dashboard (identity / relationship / squad summary / door hint)
+- [x] **DOOR-02**: Squad line shows size, health bar, and worst outlier by name — `(+N more)` when several, `★ all well · next: <name>` when healthy
+- [x] **DOOR-03**: Door hint renders only on the selected card (fixed card height, blank line when unselected)
+- [x] **DOOR-04**: Manager urgency score incorporates the worst squad outlier so troubled teams sort upward
 
 ### Hall Navigation
 
-- [ ] **HALL-01**: `Space` on a manager card enters their hall (re-rooted dashboard); no-op on IC cards
-- [ ] **HALL-02**: Hall header shows breadcrumb (`YOU ▸ JORDAN'S SQUAD`), member count, and team health bar
-- [ ] **HALL-03**: `Esc` walks up one level; hard no-op at the root dashboard (`q` is the only quit)
-- [ ] **HALL-04**: `h` at the leftmost column also ascends one level (ranger/lf convention)
-- [ ] **HALL-05**: All existing dashboard keys behave identically inside halls (`j/k/h/l`, `g/G`, `Enter`, `?`)
-- [ ] **HALL-06**: Navigation is powered by a roster path stack supporting arbitrary nesting depth
+- [x] **HALL-01**: `Space` on a manager card enters their hall (re-rooted dashboard); no-op on IC cards
+- [x] **HALL-02**: Hall header shows breadcrumb (`YOU ▸ JORDAN'S SQUAD`), member count, and team health bar
+- [x] **HALL-03**: `Esc` walks up one level; hard no-op at the root dashboard (`q` is the only quit)
+- [x] **HALL-04**: `h` at the leftmost column also ascends one level (ranger/lf convention)
+- [x] **HALL-05**: All existing dashboard keys behave identically inside halls (`j/k/h/l`, `g/G`, `Enter`, `?`)
+- [x] **HALL-06**: Navigation is powered by a roster path stack supporting arbitrary nesting depth
 - [ ] **HALL-07**: Help modal gains a "Squads" section covering `Space`, `Esc`/boundary-`h`, and skip-level notes
 
 ### Skip-Levels
@@ -61,16 +61,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DOOR-01 | Phase 1 | Pending |
-| DOOR-02 | Phase 1 | Pending |
-| DOOR-03 | Phase 1 | Pending |
-| DOOR-04 | Phase 1 | Pending |
-| HALL-01 | Phase 2 | Pending |
-| HALL-02 | Phase 2 | Pending |
-| HALL-03 | Phase 2 | Pending |
-| HALL-04 | Phase 2 | Pending |
-| HALL-05 | Phase 2 | Pending |
-| HALL-06 | Phase 2 | Pending |
+| DOOR-01 | Phase 1 | Complete |
+| DOOR-02 | Phase 1 | Complete |
+| DOOR-03 | Phase 1 | Complete |
+| DOOR-04 | Phase 1 | Complete |
+| HALL-01 | Phase 2 | Complete |
+| HALL-02 | Phase 2 | Complete |
+| HALL-03 | Phase 2 | Complete |
+| HALL-04 | Phase 2 | Complete |
+| HALL-05 | Phase 2 | Complete |
+| HALL-06 | Phase 2 | Complete |
 | HALL-07 | Phase 3 | Pending |
 | SKIP-01 | Phase 3 | Pending |
 | SKIP-02 | Phase 3 | Pending |

@@ -17,7 +17,7 @@ Quick reference for what's implemented vs planned in Vibe Manager.
 | Phase 3: Knowledge Base | 🔄 Partial | Partner/children done; dates widget planned |
 | Phase 4: Career Development | 🔄 Partial | Level tracking done; skill matrix UI planned |
 | Phase 5: Smart Features | 📋 Planned | Not started |
-| Managing Managers | 🔄 Partial | Data model, storage, metrics, sprites, dashboard doorway cards done; hall navigation, detail banner, skip-level rotation planned |
+| Managing Managers | 🔄 Partial | Data model, storage, metrics, sprites, doorway cards, hall navigation done; detail banner, skip-level rotation planned |
 
 ---
 
@@ -45,6 +45,8 @@ Quick reference for what's implemented vs planned in Vibe Manager.
 | Mood trend arrows | ✅ Done |
 | Manager doorway cards (squad bar + named outlier) | ✅ Done |
 | Squad-aware urgency sorting | ✅ Done |
+| Hall navigation (Space enters squad, Esc/boundary-h back) | ✅ Done |
+| Hall breadcrumb header with team health bar | ✅ Done |
 | Help modal (`?` key) | ✅ Done |
 | Filtering by status/seniority | 📋 Planned |
 | Quick actions from dashboard | 📋 Planned |

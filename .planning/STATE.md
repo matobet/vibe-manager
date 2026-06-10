@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-06-10)
 
 ## Current Position
 
-Phase: 1 of 4 (Doorway Cards)
+Phase: 2 of 4 (Hall Navigation)
 Plan: implemented without PLAN.md (direct execution)
-Status: Implemented — pending verification (/gsd:verify-work 1)
-Last activity: 2026-06-10 — Phase 1 implemented: DOOR-01..04 with snapshot + integration tests
+Status: Phases 1-2 implemented — pending verification (/gsd:verify-work)
+Last activity: 2026-06-11 — Phase 2 implemented: HALL-01..06 with hall integration tests
 
-Progress: [██░░░░░░░░] ~25%
+Progress: [█████░░░░░] ~50%
 
 ## Performance Metrics
 
@@ -68,6 +68,13 @@ Decisions are logged in PROJECT.md Key Decisions table.
   views render `squad 0 · no members yet` when team_size == 0.
 - 2026-06-10 — Skip-level cadence: all 2nd-level summaries computed against
   workspace default_2nd_level_frequency (per-member override deferred to Phase 3).
+- 2026-06-11 — Phase 2 (Hall Navigation) executed directly in-session (same
+  user-approved GSD bypass). Commit ca1d924. HALL-01..06 complete; HALL-07
+  (help modal) stays in Phase 3. `n` (recruit) is intentionally blocked inside
+  halls until 2nd-level creation is specced.
+- 2026-06-11 — Fixed latent sprite bug: mood-2 fullwidth compensation fired
+  even when the overdue face replaced the frown (visible once halls rendered
+  2nd-level cards).
 Recent decisions affecting current work:
 
 - Guild Halls drill-down over accordion expansion; one hall per screen, dashboard component re-rooted

@@ -179,7 +179,7 @@ This roadmap outlines the phased development approach for Vibe Manager, from MVP
 | Nested team structure | team/ subdirectory for 2nd-level reports | P0 | ✅ Done |
 | Team metrics | Health score, average mood, overdue count | P0 | ✅ Done |
 | Default 2nd-level frequency | Workspace setting for skip-level cadence | P0 | ✅ Done |
-| Manager dashboard cards | Team health bar, expand/collapse | P0 | 📋 Planned |
+| Manager dashboard cards | Doorway card: squad health bar + named worst outlier | P0 | ✅ Done |
 | Manager detail view | Team roster with navigation | P0 | 📋 Planned |
 | Skip-level tracking | Alerts for overdue skip-levels | P1 | 📋 Planned |
 

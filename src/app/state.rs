@@ -86,7 +86,7 @@ impl App {
             .collect();
 
         // Sort by urgency score (highest first = needs most attention)
-        all_data.sort_by(|a, b| b.2.urgency_score.cmp(&a.2.urgency_score));
+        all_data.sort_by_key(|d| std::cmp::Reverse(d.2.urgency_score));
 
         // Unpack into separate vectors
         for (report, entries, summary) in all_data {

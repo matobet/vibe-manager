@@ -130,10 +130,8 @@ impl NewReportState {
                     self.level_index -= 1;
                 }
             }
-            NewReportField::Frequency => {
-                if self.frequency_index > 0 {
-                    self.frequency_index -= 1;
-                }
+            NewReportField::Frequency if self.frequency_index > 0 => {
+                self.frequency_index -= 1;
             }
             _ => {}
         }
@@ -154,10 +152,8 @@ impl NewReportState {
                     self.level_index += 1;
                 }
             }
-            NewReportField::Frequency => {
-                if self.frequency_index < 2 {
-                    self.frequency_index += 1;
-                }
+            NewReportField::Frequency if self.frequency_index < 2 => {
+                self.frequency_index += 1;
             }
             _ => {}
         }

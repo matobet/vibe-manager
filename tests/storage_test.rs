@@ -241,13 +241,31 @@ mod manager_tests {
         let repo = fixtures_repo();
         let team = repo.report("chris-wong").list_team_members().unwrap();
 
-        assert_eq!(team.len(), 3);
+        assert_eq!(team.len(), 7);
 
         let names: Vec<_> = team.iter().map(|r| r.slug()).collect();
 
         assert!(names.contains(&"morgan-smith"));
         assert!(names.contains(&"lee-kim"));
         assert!(names.contains(&"robin-patel"));
+        assert!(names.contains(&"ana-petrov"));
+        assert!(names.contains(&"devon-okafor"));
+        assert!(names.contains(&"jamie-flores"));
+        assert!(names.contains(&"taylor-brooks"));
+    }
+
+    #[test]
+    fn test_nested_manager_loads_as_team_member() {
+        // taylor-brooks is a manager INSIDE chris-wong's team, with their own
+        // team/ one level deeper (3rd level). They must load like any member.
+        let repo = fixtures_repo();
+        let team = repo.report("chris-wong").list_team_members().unwrap();
+        let taylor = team.iter().find(|r| r.slug() == "taylor-brooks").unwrap();
+        let report = taylor.load().unwrap();
+
+        assert_eq!(report.profile.name, "Taylor Brooks");
+        assert!(report.profile.report_type.is_manager());
+        assert_eq!(report.manager_slug, Some("chris-wong".to_string()));
     }
 
     #[test]
@@ -364,8 +382,8 @@ mod manager_tests {
         let names: Vec<_> = team.iter().map(|r| r.slug()).collect();
 
         assert!(!names.contains(&".hidden"));
-        // Should still have the 3 valid team members
-        assert_eq!(team.len(), 3);
+        // Should still have the 7 valid team members
+        assert_eq!(team.len(), 7);
     }
 
     #[test]
@@ -377,8 +395,8 @@ mod manager_tests {
         let names: Vec<_> = team.iter().map(|r| r.slug()).collect();
 
         assert!(!names.contains(&"no-profile"));
-        // Should still have the 3 valid team members
-        assert_eq!(team.len(), 3);
+        // Should still have the 7 valid team members
+        assert_eq!(team.len(), 7);
     }
 
     #[test]
@@ -396,7 +414,7 @@ mod manager_tests {
         }
 
         // Verify team is populated
-        assert_eq!(manager.team.len(), 3);
+        assert_eq!(manager.team.len(), 7);
 
         // Verify each team member has correct manager_slug
         for team_member in &manager.team {
@@ -409,5 +427,9 @@ mod manager_tests {
         assert!(team_slugs.contains(&"lee-kim"));
         assert!(team_slugs.contains(&"morgan-smith"));
         assert!(team_slugs.contains(&"robin-patel"));
+        assert!(team_slugs.contains(&"ana-petrov"));
+        assert!(team_slugs.contains(&"devon-okafor"));
+        assert!(team_slugs.contains(&"jamie-flores"));
+        assert!(team_slugs.contains(&"taylor-brooks"));
     }
 }

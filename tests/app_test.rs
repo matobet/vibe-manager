@@ -333,14 +333,24 @@ mod tests {
             .expect("manager should have team metrics after load");
 
         // Structure-only assertions — fixture dates drift against Local::now()
-        assert_eq!(metrics.team_size, 3);
+        assert_eq!(metrics.team_size, 7);
         assert!(
             !metrics.outliers.is_empty(),
-            "Morgan (mood 2) should flag at least one outlier"
+            "Devon (never met) and Morgan (mood 2) should flag outliers"
         );
-        // Mood 2 is date-independent: Morgan always outranks mood-4/5 peers
-        assert_eq!(metrics.outliers[0].name, "Morgan Smith");
-        assert!(metrics.next_in_rotation.is_some());
+        // Date-independent ordering: Devon never met (urgency 110) beats
+        // Morgan's mood-2 (overdue cap 80 + 20), which beats mood-4/5 peers
+        assert_eq!(metrics.outliers[0].name, "Devon Okafor");
+        assert_eq!(metrics.outliers[1].name, "Morgan Smith");
+
+        // Jamie is inactive (on leave): counted in squad size, never an outlier
+        assert!(
+            !metrics.outliers.iter().any(|o| o.name == "Jamie Flores"),
+            "inactive members must not flag as outliers"
+        );
+
+        // Never-met ranks first in the skip-level rotation
+        assert_eq!(metrics.next_in_rotation.as_deref(), Some("Devon Okafor"));
     }
 
     #[test]
@@ -392,7 +402,7 @@ mod tests {
             .team_metrics
             .as_ref()
             .expect("team metrics must survive recording an observation");
-        assert_eq!(metrics.team_size, 3);
+        assert_eq!(metrics.team_size, 7);
         assert!(!metrics.outliers.is_empty());
     }
 
@@ -412,7 +422,7 @@ mod tests {
             .team_metrics
             .as_ref()
             .expect("team metrics must survive deleting an entry");
-        assert_eq!(metrics.team_size, 3);
+        assert_eq!(metrics.team_size, 7);
     }
 
     #[test]

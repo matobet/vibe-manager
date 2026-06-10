@@ -6,7 +6,7 @@
 use anyhow::Result;
 
 use super::{App, Effect, Msg, ViewMode};
-use crate::model::{compute_report_summary, compute_workspace_summary, ManagerInfo};
+use crate::model::ManagerInfo;
 
 impl App {
     /// Process a message and update state (TEA update function)
@@ -423,15 +423,7 @@ impl App {
             ) {
                 Ok(entry) => {
                     self.entries_by_report[report_idx].push(entry);
-                    // Recompute summary
-                    let report = &self.reports[report_idx];
-                    let entries = &self.entries_by_report[report_idx];
-                    self.summaries[report_idx] = compute_report_summary(
-                        report,
-                        entries,
-                        self.workspace.config.settings.overdue_threshold_days,
-                    );
-                    self.workspace_summary = compute_workspace_summary(&self.summaries);
+                    self.recompute_summary(report_idx);
                     self.set_status("Observation recorded");
                 }
                 Err(e) => {

@@ -10,7 +10,8 @@ use anyhow::Result;
 use super::{App, ViewMode, STATUS_MESSAGE_DURATION};
 use crate::components::modal::NewReportState;
 use crate::model::{
-    compute_report_summary, compute_workspace_summary, Context, JournalEntry, WorkspaceSummary,
+    compute_report_summary, compute_report_summary_with_frequency, compute_team_metrics,
+    compute_workspace_summary, manager_urgency_bonus, Context, JournalEntry, WorkspaceSummary,
 };
 use crate::storage::WorkspaceRepository;
 
@@ -60,27 +61,45 @@ impl App {
         self.entries_by_report.clear();
         self.summaries.clear();
 
+        // 2nd-level overdue status follows the workspace skip-level cadence,
+        // not each member's own profile frequency (per-member overrides are Phase 3)
+        let second_level_days =
+            frequency_to_days(&self.workspace.config.settings.default_2nd_level_frequency);
+        let overdue_threshold = self.workspace.config.settings.overdue_threshold_days;
+
         // Collect all report data
         let mut all_data: Vec<_> = report_repos
             .into_iter()
             .filter_map(|report_repo| {
                 let mut report = report_repo.load().ok()?;
 
-                // Load team members for managers
+                // Load team members for managers, computing their summaries
+                // in-loop to build TeamMetrics (members never enter the
+                // index-aligned reports/entries/summaries Vecs)
+                let mut member_summaries = Vec::new();
                 if report_repo.has_team() {
                     for team_repo in report_repo.list_team_members().unwrap_or_default() {
                         if let Ok(team_member) = team_repo.load() {
+                            let member_entries = team_repo.entries().list().unwrap_or_default();
+                            member_summaries.push(compute_report_summary_with_frequency(
+                                &team_member,
+                                &member_entries,
+                                second_level_days,
+                                overdue_threshold,
+                            ));
                             report.team.push(team_member);
                         }
                     }
                 }
 
                 let entries = report_repo.entries().list().unwrap_or_default();
-                let summary = compute_report_summary(
-                    &report,
-                    &entries,
-                    self.workspace.config.settings.overdue_threshold_days,
-                );
+                let mut summary = compute_report_summary(&report, &entries, overdue_threshold);
+
+                if report.is_manager() {
+                    let team_metrics = compute_team_metrics(&member_summaries);
+                    summary.urgency_score += manager_urgency_bonus(&team_metrics);
+                    summary.team_metrics = Some(team_metrics);
+                }
                 Some((report, entries, summary))
             })
             .collect();
@@ -144,17 +163,29 @@ impl App {
         self.entries_by_report[report_idx].remove(entry_idx);
         self.selected_entry_index = None;
 
-        // Recompute summary for this report
-        let report = &self.reports[report_idx];
-        let entries = &self.entries_by_report[report_idx];
-        self.summaries[report_idx] = compute_report_summary(
-            report,
-            entries,
-            self.workspace.config.settings.overdue_threshold_days,
-        );
-        self.workspace_summary = compute_workspace_summary(&self.summaries);
+        self.recompute_summary(report_idx);
 
         Ok(())
+    }
+
+    /// Recompute the summary for one report, preserving team metrics
+    ///
+    /// Squad data is unaffected by the manager's own entries, so the previous
+    /// team metrics (and their urgency bonus) carry over. Without this, any
+    /// entry mutation would silently wipe the manager's squad line.
+    pub(crate) fn recompute_summary(&mut self, report_idx: usize) {
+        let prev_team_metrics = self.summaries[report_idx].team_metrics.take();
+        let mut summary = compute_report_summary(
+            &self.reports[report_idx],
+            &self.entries_by_report[report_idx],
+            self.workspace.config.settings.overdue_threshold_days,
+        );
+        if let Some(team_metrics) = prev_team_metrics {
+            summary.urgency_score += manager_urgency_bonus(&team_metrics);
+            summary.team_metrics = Some(team_metrics);
+        }
+        self.summaries[report_idx] = summary;
+        self.workspace_summary = compute_workspace_summary(&self.summaries);
     }
 
     /// Get entries for currently selected report
@@ -201,5 +232,15 @@ impl App {
             ViewMode::ReportDetail => self.selected_meeting_count(),
             _ => 0,
         }
+    }
+}
+
+/// Map a frequency setting string to days (skip-level cadence defaults to monthly)
+fn frequency_to_days(frequency: &str) -> u32 {
+    match frequency {
+        "weekly" => 7,
+        "biweekly" => 14,
+        "monthly" => 30,
+        _ => 30,
     }
 }

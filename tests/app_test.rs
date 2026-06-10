@@ -312,4 +312,127 @@ mod tests {
             meeting_count
         );
     }
+
+    /// Find Chris Wong (the fixture manager with a 3-member squad)
+    fn chris_wong_idx(app: &vibe_manager::app::App) -> usize {
+        app.reports
+            .iter()
+            .position(|e| e.profile.name == "Chris Wong")
+            .expect("Chris Wong not found")
+    }
+
+    #[test]
+    fn test_manager_team_metrics_loaded_at_runtime() {
+        let path = fixtures_path();
+        let app = vibe_manager::app::App::new(path).expect("Failed to load app");
+
+        let idx = chris_wong_idx(&app);
+        let metrics = app.summaries[idx]
+            .team_metrics
+            .as_ref()
+            .expect("manager should have team metrics after load");
+
+        // Structure-only assertions — fixture dates drift against Local::now()
+        assert_eq!(metrics.team_size, 3);
+        assert!(
+            !metrics.outliers.is_empty(),
+            "Morgan (mood 2) should flag at least one outlier"
+        );
+        // Mood 2 is date-independent: Morgan always outranks mood-4/5 peers
+        assert_eq!(metrics.outliers[0].name, "Morgan Smith");
+        assert!(metrics.next_in_rotation.is_some());
+    }
+
+    #[test]
+    fn test_manager_urgency_includes_squad_bonus() {
+        use vibe_manager::model::{compute_report_summary, manager_urgency_bonus};
+
+        let path = fixtures_path();
+        let app = vibe_manager::app::App::new(path).expect("Failed to load app");
+
+        let idx = chris_wong_idx(&app);
+        let metrics = app.summaries[idx]
+            .team_metrics
+            .as_ref()
+            .expect("manager should have team metrics");
+        let bonus = manager_urgency_bonus(metrics);
+        assert!(bonus > 0, "troubled squad should produce a positive bonus");
+
+        // The loaded score is exactly the manager's own score plus the bonus
+        let own_summary = compute_report_summary(
+            &app.reports[idx],
+            &app.entries_by_report[idx],
+            app.workspace.config.settings.overdue_threshold_days,
+        );
+        assert_eq!(
+            app.summaries[idx].urgency_score,
+            own_summary.urgency_score + bonus
+        );
+    }
+
+    #[test]
+    fn test_team_metrics_survive_save_entry() {
+        use vibe_manager::app::{Msg, ViewMode};
+
+        let temp = setup_temp_workspace();
+        let mut app =
+            vibe_manager::app::App::new(temp.path().to_path_buf()).expect("Failed to load app");
+
+        let idx = chris_wong_idx(&app);
+        assert!(app.summaries[idx].team_metrics.is_some());
+
+        // Record a mood observation for the manager
+        app.selected_report_index = Some(idx);
+        app.view_mode = ViewMode::ReportDetail;
+        app.update(Msg::ShowEntryInput).unwrap();
+        app.update(Msg::SetEntryMood(4)).unwrap();
+        app.update(Msg::SaveEntry).unwrap();
+
+        let metrics = app.summaries[idx]
+            .team_metrics
+            .as_ref()
+            .expect("team metrics must survive recording an observation");
+        assert_eq!(metrics.team_size, 3);
+        assert!(!metrics.outliers.is_empty());
+    }
+
+    #[test]
+    fn test_team_metrics_survive_delete_entry() {
+        let temp = setup_temp_workspace();
+        let mut app =
+            vibe_manager::app::App::new(temp.path().to_path_buf()).expect("Failed to load app");
+
+        let idx = chris_wong_idx(&app);
+        assert!(app.summaries[idx].team_metrics.is_some());
+        assert!(!app.entries_by_report[idx].is_empty());
+
+        app.delete_entry(idx, 0).expect("Failed to delete entry");
+
+        let metrics = app.summaries[idx]
+            .team_metrics
+            .as_ref()
+            .expect("team metrics must survive deleting an entry");
+        assert_eq!(metrics.team_size, 3);
+    }
+
+    #[test]
+    fn test_manager_without_team_dir_gets_empty_metrics() {
+        let path = fixtures_path();
+        let app = vibe_manager::app::App::new(path).expect("Failed to load app");
+
+        let idx = app
+            .reports
+            .iter()
+            .position(|e| e.profile.name == "Minimal Manager")
+            .expect("Minimal Manager not found");
+
+        // No team/ dir: metrics exist but are empty — views render
+        // "squad 0 · no members yet" and the urgency bonus is zero
+        let metrics = app.summaries[idx]
+            .team_metrics
+            .as_ref()
+            .expect("managers always get team metrics");
+        assert_eq!(metrics.team_size, 0);
+        assert!(metrics.outliers.is_empty());
+    }
 }

@@ -2,9 +2,9 @@
 
 Quick reference for what's implemented vs planned in Vibe Manager.
 
-**Last Updated:** January 2026
+**Last Updated:** June 2026
 
-**Current Phase:** Managing Managers (complete)
+**Current Phase:** Managing Managers (foundation complete, UI layer remaining)
 
 ---
 
@@ -17,7 +17,7 @@ Quick reference for what's implemented vs planned in Vibe Manager.
 | Phase 3: Knowledge Base | 🔄 Partial | Partner/children done; dates widget planned |
 | Phase 4: Career Development | 🔄 Partial | Level tracking done; skill matrix UI planned |
 | Phase 5: Smart Features | 📋 Planned | Not started |
-| Managing Managers | ✅ Complete | Manager tracking, team health, expand/collapse, skip-levels |
+| Managing Managers | 🔄 Partial | Data model, storage, metrics, manager sprites done; dashboard team UI, detail roster, skip-level navigation planned |
 
 ---
 
@@ -104,20 +104,21 @@ Quick reference for what's implemented vs planned in Vibe Manager.
 | Development goals | 📋 Planned |
 | Time in level display | 📋 Planned |
 
-### Managing Managers ✅
+### Managing Managers 🔄
 
 | Feature | Status |
 |---------|--------|
 | Report type (IC/Manager) in profile | ✅ Done |
 | M-track levels (M1-M5) | ✅ Done |
+| Manager sprites with headband (4-line) | ✅ Done |
 | Nested team/ directory structure | ✅ Done |
-| Team metrics computation | ✅ Done |
-| Load 2nd-level reports | ✅ Done |
+| Team metrics computation | ✅ Done (computed, not yet shown in UI) |
+| Load 2nd-level reports | ✅ Done (loaded, not yet navigable in UI) |
 | Default 2nd-level frequency setting | ✅ Done |
-| Manager cards with team health | ✅ Done |
-| Expand/collapse manager teams | ✅ Done |
-| Manager detail view | ✅ Done |
-| Skip-level meeting tracking | ✅ Done |
+| Manager cards with team health | 📋 Planned |
+| Expand/collapse manager teams | 📋 Planned |
+| Manager detail view with team roster | 📋 Planned |
+| Skip-level meeting tracking | 📋 Planned |
 
 ---
 

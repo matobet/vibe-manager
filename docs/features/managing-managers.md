@@ -12,10 +12,10 @@ Track managers as direct reports (managers of managers), with visibility into th
 | Storage: Load nested team directories | ✅ Done | `list_team_member_dirs()` |
 | Storage: Manager info in profile | ✅ Done | `manager_info` field |
 | Computed: Team metrics | ✅ Done | `TeamMetrics` struct |
-| Dashboard: Manager cards with team health | ✅ Done | Team health bar + overdue count |
-| Dashboard: Expand/collapse manager teams | ✅ Done | Space key toggles expansion |
-| Manager detail view | ✅ Done | Team health panel + roster |
-| Skip-level support | ✅ Done | Navigate into team members, create skip-level meetings |
+| Dashboard: Manager cards with team health | 📋 Planned | TeamMetrics computed but not rendered |
+| Dashboard: Expand/collapse manager teams | 📋 Planned | No expansion state or key binding yet |
+| Manager detail view | 📋 Planned | Detail view only adjusts sprite height for managers |
+| Skip-level support | 📋 Planned | Report.team loaded but not navigable; no skip-level meeting creation |
 
 ---
 
@@ -265,10 +265,11 @@ Per-report overrides use the same `meeting_frequency` field.
 |------|---------|
 | `src/model/report.rs` | ReportType, ManagerInfo, M-track levels |
 | `src/model/computed.rs` | TeamMetrics computation |
-| `src/storage/workspace.rs` | Nested directory loading |
-| `src/storage/profile.rs` | load_report_with_manager() |
+| `src/storage/repo/workspace.rs` | Nested directory loading |
+| `src/storage/repo/report.rs` | Profile loading incl. team members |
+| `src/theme/sprites.rs` | Manager sprites with headband |
 | `src/components/avatar.rs` | Manager card rendering |
-| `src/app.rs` | Team loading, ViewMode updates |
+| `src/app/state.rs` | Team loading, report state |
 
 ---
 
